@@ -3,7 +3,6 @@
 
 #include <cassert>
 #include <cstring>
-#include <sstream>
 
 
 static constexpr long long min_port = 0;
@@ -14,12 +13,24 @@ HostAddress::HostAddress(const std::string &address) {
     resolve(address);
 }
 
-const addrinfo *HostAddress::get() const noexcept {
-    return address_ptr.get();
+
+void HostAddress::set(const SocketAddress& sock_addr) noexcept {
+    if (addr_ptr == nullptr) {
+        addr_ptr = std::make_unique<SocketAddress>(sock_addr);
+    }
+    else {
+        memcpy(addr_ptr.get(), &sock_addr, sizeof(SocketAddress));
+    }
 }
 
+
+const HostAddress::SocketAddress *HostAddress::get() const noexcept {
+    return addr_ptr.get();
+}
+
+
 bool HostAddress::resolve(const std::string &address) {
-    address_ptr.reset();
+    addr_ptr.reset();
 
     addrinfo hints;
     memset(&hints, 0, sizeof(addrinfo));
@@ -48,25 +59,12 @@ bool HostAddress::resolve(const std::string &address) {
     if (s != 0) {
         return false;
     }
+
     assert(result != nullptr);
-
-    address_ptr.reset(result);
+    auto ip_ver = result->ai_family == AF_INET ? IpVersion::IPv4 :
+                  result->ai_family == AF_INET6 ? IpVersion::IPv6 : IpVersion::None;
+    SocketAddress sock_addr = {*result->ai_addr, result->ai_addrlen, ip_ver};
+    addr_ptr = std::make_unique<SocketAddress>(sock_addr);
+    freeaddrinfo(result);
     return true;
-}
-
-HostAddress::IpVersion HostAddress::get_ip_version() const noexcept {
-    auto ptr = get();
-    if (ptr == nullptr) {
-        return IpVersion::None;
-    }
-
-    switch (ptr->ai_family) {
-        case AF_INET:  return IpVersion::IPv4;
-        case AF_INET6: return IpVersion::IPv6;
-        default:       return IpVersion::None;
-    }
-}
-
-void HostAddress::AddrInfoDeleter::operator()(addrinfo *ptr) const noexcept {
-    freeaddrinfo(ptr);
 }

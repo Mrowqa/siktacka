@@ -9,13 +9,16 @@ extern const std::size_t max_datagram_size;
 
 
 class UdpSocket final : Socket {
+private:
+    HostAddress::SocketAddress preallocated_sock_addr;
+
 public:
     UdpSocket() noexcept = default;
 
     // TODO gdzie noexcept?
-    Socket::Status init(HostAddress::IpVersion version) noexcept;
-    Socket::Status send(const std::string& data, std::size_t& sent, const HostAddress& dst_addr);
-    Socket::Status receive(std::string& data, HostAddress& src_addr);
+    Socket::Status init(HostAddress::IpVersion ip_ver) noexcept;
+    Socket::Status send(const std::string& data, const HostAddress& dst_addr) noexcept;
+    Socket::Status receive(std::string& buffer, HostAddress& src_addr) noexcept;
 };
 
 

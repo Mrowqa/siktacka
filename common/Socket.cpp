@@ -59,16 +59,22 @@ Socket::Status Socket::bind(const HostAddress &host_addr) const noexcept {
     assert(sockfd >= 0);
 
     auto addr_ptr = host_addr.get();
-    return ::bind(sockfd, addr_ptr->ai_addr, addr_ptr->ai_addrlen) == 0
+    return ::bind(sockfd, &addr_ptr->addr, addr_ptr->addrlen) == 0
            ? Status::Done : Status::Error;
 }
 
 
-Socket::Status Socket::init(HostAddress::IpVersion version, int socktype) noexcept {
-    assert(version != HostAddress::IpVersion::None);
+Socket::Status Socket::init(HostAddress::IpVersion ip_ver, int socktype) noexcept {
+    assert(ip_ver != HostAddress::IpVersion::None);
+    assert(sockfd == -1);
 
-    sockfd = socket(version == HostAddress::IpVersion::IPv4 ? AF_INET : AF_INET6,
+    sockfd = socket(ip_ver == HostAddress::IpVersion::IPv4 ? AF_INET : AF_INET6,
                     socktype, 0);
 
-    return sockfd >= 0 ? Status::Done : Status::Error;
+    if (sockfd < 0) {
+        return Status::Error;
+    }
+
+    this->ip_ver = ip_ver;
+    return Status::Done;
 }

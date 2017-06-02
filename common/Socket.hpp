@@ -8,6 +8,7 @@
 class Socket {
 protected:
     int sockfd = -1;
+    HostAddress::IpVersion ip_ver = HostAddress::IpVersion::None;
 
 public:
     enum class Status {
@@ -27,7 +28,7 @@ public:
 protected:
     Socket() = default;
     Socket::Status get_error_status() const noexcept;
-    Socket::Status init(HostAddress::IpVersion version, int socktype) noexcept;
+    Socket::Status init(HostAddress::IpVersion ip_ver, int socktype) noexcept;
 };
 
 

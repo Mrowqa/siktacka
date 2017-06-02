@@ -11,14 +11,6 @@
 
 
 class HostAddress final {
-private:
-    class AddrInfoDeleter final {
-    public:
-        void operator()(addrinfo *ptr) const noexcept;
-    };
-
-    std::unique_ptr<addrinfo, AddrInfoDeleter> address_ptr;
-
 public:
     enum class IpVersion {
         None,
@@ -26,11 +18,22 @@ public:
         IPv6,
     };
 
+    struct SocketAddress {
+        sockaddr addr;
+        socklen_t addrlen;
+        IpVersion ip_version;
+    };
+
+private:
+    std::unique_ptr<SocketAddress> addr_ptr;
+
+public:
+
     HostAddress() noexcept = default;
     HostAddress(const std::string &address);
 
-    const addrinfo *get() const noexcept;
-    IpVersion get_ip_version() const noexcept;
+    void set(const SocketAddress& sock_addr) noexcept;
+    const SocketAddress *get() const noexcept;
     bool resolve(const std::string& address);
 };
 

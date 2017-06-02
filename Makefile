@@ -7,10 +7,12 @@ LFLAGS = -Wall -Wextra
 HEADERS = common/HostAddress.hpp \
     common/utils.hpp \
     common/utils_impl.hpp \
+    common/Socket.hpp \
     client/Client.hpp
 
 COMMON_OBJS = common/HostAddress.o \
-    common/utils.o
+    common/utils.o \
+    common/Socket.o
 SERVER_OBJS = server/main.o \
     $(COMMON_OBJS)
 CLIENT_OBJS = client/main.o \

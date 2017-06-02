@@ -1,19 +1,23 @@
 TARGET = siktacka-server siktacka-client
 CC = clang++
-CFLAGS = -Wall -Wextra -O3
+CFLAGS = -Wall -Wextra --std=c++14 -O3
 LFLAGS = -Wall -Wextra
 
 
-SERVER_OBJS = server/main.cpp
-CLIENT_OBJS = client/main.cpp
+HEADERS = common/HostAddress.hpp
 
+COMMON_OBJS = common/HostAddress.o
+SERVER_OBJS = server/main.o \
+    $(COMMON_OBJS)
+CLIENT_OBJS = client/main.o \
+    $(COMMON_OBJS)
 
 siktacka: $(TARGET)
 all: siktacka
 
 %.cpp: %.hpp
 
-%.o: %.cpp
+%.o: %.cpp $(HEADERS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 siktacka-server: $(SERVER_OBJS)
@@ -28,5 +32,5 @@ clean:
 	rm -f $(TARGET) *.o *~ *.bak
 
 remote:
-	scp -r * loli-citadel:students/sik/zad2/
+	scp -r * loli-citadel:students/sik/zad2/ >/dev/null
 	ssh loli-citadel "(cd students/sik/zad2/; make)"

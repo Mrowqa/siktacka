@@ -1,8 +1,13 @@
 #include "HostAddress.hpp"
+#include "utils.hpp"
 
 #include <cassert>
 #include <cstring>
 #include <sstream>
+
+
+static constexpr long long min_port = 0;
+static constexpr long long max_port = 65535;
 
 
 HostAddress::HostAddress(const std::string &address) {
@@ -25,10 +30,18 @@ void HostAddress::resolve(const std::string &address) {
     hints.ai_addr = NULL;
     hints.ai_next = NULL;
 
-    addrinfo *result = nullptr;
     auto divider_pos = address.rfind(':');
     auto hostname = address.substr(0, divider_pos);
     auto port = divider_pos < address.length() - 1 ? address.substr(divider_pos + 1) : "";
+
+    if (!port.empty()) {
+        auto port_num = from_string<long long>(port);
+        if (port_num < min_port || max_port < port_num) {
+            throw std::runtime_error("invalid port: " + port);
+        }
+    }
+
+    addrinfo *result = nullptr;
     int s = getaddrinfo(hostname.empty() ? nullptr : hostname.c_str(),
                         port.empty() ? nullptr : port.c_str(), &hints, &result);
     if (s != 0) {
@@ -36,6 +49,7 @@ void HostAddress::resolve(const std::string &address) {
         msg << "getaddrinfo: " << gai_strerror(s);
         throw std::runtime_error(msg.str());
     }
+    assert(result != nullptr);
 
     address_ptr.reset(result);
 }

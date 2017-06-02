@@ -4,12 +4,17 @@ CFLAGS = -Wall -Wextra --std=c++14 -O3
 LFLAGS = -Wall -Wextra
 
 
-HEADERS = common/HostAddress.hpp
+HEADERS = common/HostAddress.hpp \
+    common/utils.hpp \
+    common/utils_impl.hpp \
+    client/Client.hpp
 
-COMMON_OBJS = common/HostAddress.o
+COMMON_OBJS = common/HostAddress.o \
+    common/utils.o
 SERVER_OBJS = server/main.o \
     $(COMMON_OBJS)
 CLIENT_OBJS = client/main.o \
+    client/Client.o \
     $(COMMON_OBJS)
 
 siktacka: $(TARGET)

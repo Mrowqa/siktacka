@@ -1,6 +1,9 @@
+#include "Client.hpp"
+
 #include <iostream>
 
-int main() {
-    std::cout << "Hello, World!" << std::endl;
+
+int main(int argc, char *argv[]) {
+    Client client(argc, argv);
     return 0;
 }

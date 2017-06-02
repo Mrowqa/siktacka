@@ -20,11 +20,18 @@ private:
     std::unique_ptr<addrinfo, AddrInfoDeleter> address_ptr;
 
 public:
-    HostAddress(const std::string &address);
-    const addrinfo &get() const noexcept;
+    enum class IpVersion {
+        None,
+        IPv4,
+        IPv6,
+    };
 
-private:
-    void resolve(const std::string& address);
+    HostAddress() noexcept = default;
+    HostAddress(const std::string &address);
+
+    const addrinfo *get() const noexcept;
+    IpVersion get_ip_version() const noexcept;
+    bool resolve(const std::string& address);
 };
 
 

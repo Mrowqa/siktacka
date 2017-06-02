@@ -7,8 +7,8 @@
 
 class Client {
 private:
-    std::unique_ptr<HostAddress> server_address;
-    std::unique_ptr<HostAddress> gui_address;
+    HostAddress server_address;
+    HostAddress gui_address;
     std::string player_name;
 
 public:

@@ -14,12 +14,13 @@ HostAddress::HostAddress(const std::string &address) {
     resolve(address);
 }
 
-const addrinfo &HostAddress::get() const noexcept {
-    assert(address_ptr != nullptr);
-    return *address_ptr;
+const addrinfo *HostAddress::get() const noexcept {
+    return address_ptr.get();
 }
 
-void HostAddress::resolve(const std::string &address) {
+bool HostAddress::resolve(const std::string &address) {
+    address_ptr.reset();
+
     addrinfo hints;
     memset(&hints, 0, sizeof(addrinfo));
     hints.ai_family = AF_UNSPEC;    // Allow IPv4 or IPv6
@@ -37,7 +38,7 @@ void HostAddress::resolve(const std::string &address) {
     if (!port.empty()) {
         auto port_num = from_string<long long>(port);
         if (port_num < min_port || max_port < port_num) {
-            throw std::runtime_error("invalid port: " + port);
+            return false;
         }
     }
 
@@ -45,13 +46,25 @@ void HostAddress::resolve(const std::string &address) {
     int s = getaddrinfo(hostname.empty() ? nullptr : hostname.c_str(),
                         port.empty() ? nullptr : port.c_str(), &hints, &result);
     if (s != 0) {
-        std::ostringstream msg;
-        msg << "getaddrinfo: " << gai_strerror(s);
-        throw std::runtime_error(msg.str());
+        return false;
     }
     assert(result != nullptr);
 
     address_ptr.reset(result);
+    return true;
+}
+
+HostAddress::IpVersion HostAddress::get_ip_version() const noexcept {
+    auto ptr = get();
+    if (ptr == nullptr) {
+        return IpVersion::None;
+    }
+
+    switch (ptr->ai_family) {
+        case AF_INET:  return IpVersion::IPv4;
+        case AF_INET6: return IpVersion::IPv6;
+        default:       return IpVersion::None;
+    }
 }
 
 void HostAddress::AddrInfoDeleter::operator()(addrinfo *ptr) const noexcept {

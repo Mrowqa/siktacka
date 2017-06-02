@@ -24,15 +24,17 @@ void Client::parseArguments(int argc, char **argv) noexcept {
                ? hostname + ':' + std::to_string(port) : hostname;
     };
 
-    // TODO validate player_name!
     player_name = argv[1];
-    try {
-        server_address = std::make_unique<HostAddress>(with_default_port(argv[2], server_default_port));
-        gui_address = std::make_unique<HostAddress>(
-                with_default_port(argc == 4 ? argv[3] : gui_default_hostname, gui_default_port));
+    // TODO validate player_name!
+
+    if (server_address.resolve(with_default_port(argv[2], server_default_port))) {
+        std::cerr << "Failed to resolve server address.\n";
+        exit(1);
     }
-    catch (std::exception &exc) {
-        std::cerr << exc.what() << std::endl;
+
+    if (gui_address.resolve(
+            with_default_port(argc == 4 ? argv[3] : gui_default_hostname, gui_default_port))) {
+        std::cerr << "Failed to resolve gui address.\n";
         exit(1);
     }
 }

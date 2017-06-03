@@ -1,26 +1,23 @@
 #include "HostAddress.hpp"
 #include <common/utils.hpp>
 
+#include <arpa/inet.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include <cassert>
 #include <cstring>
 
 
-static constexpr long long min_port = 0;
-static constexpr long long max_port = 65535;
-
-
-HostAddress::HostAddress(const std::string &address) {
-    resolve(address);
+HostAddress::HostAddress(const std::string &host, unsigned short port) {
+    resolve(host, port);
 }
 
 
 void HostAddress::set(const SocketAddress& sock_addr) noexcept {
     if (addr_ptr == nullptr) {
-        addr_ptr = std::make_unique<SocketAddress>(sock_addr);
+        addr_ptr = std::make_unique<SocketAddress>();
     }
-    else {
-        memcpy(addr_ptr.get(), &sock_addr, sizeof(SocketAddress));
-    }
+    memcpy(addr_ptr.get(), &sock_addr, sizeof(SocketAddress));
 }
 
 
@@ -29,42 +26,87 @@ const HostAddress::SocketAddress *HostAddress::get() const noexcept {
 }
 
 
-bool HostAddress::resolve(const std::string &address) {
+bool HostAddress::resolve(const std::string &host, unsigned short port) {
     addr_ptr.reset();
-
-    addrinfo hints;
-    memset(&hints, 0, sizeof(addrinfo));
-    hints.ai_family = AF_UNSPEC;    // Allow IPv4 or IPv6
-    hints.ai_socktype = 0;          // Allow all types (i.a. UDP & TCP)
-    hints.ai_flags = AI_PASSIVE;    // For wildcard IP address
-    hints.ai_protocol = 0;          // Any protocol
-    hints.ai_canonname = NULL;
-    hints.ai_addr = NULL;
-    hints.ai_next = NULL;
-
-    auto divider_pos = address.rfind(':');
-    auto hostname = address.substr(0, divider_pos);
-    auto port = divider_pos < address.length() - 1 ? address.substr(divider_pos + 1) : "";
-
-    if (!port.empty()) {
-        auto port_num = from_string<long long>(port);
-        if (port_num < min_port || max_port < port_num) {
-            return false;
-        }
-    }
-
     addrinfo *result = nullptr;
-    int s = getaddrinfo(hostname.empty() ? nullptr : hostname.c_str(),
-                        port.empty() ? nullptr : port.c_str(), &hints, &result);
+    int s = getaddrinfo(host.empty() ? nullptr : host.c_str(),
+                        nullptr, nullptr, &result);
     if (s != 0) {
         return false;
     }
 
     assert(result != nullptr);
+
+    bool success = true;
     auto ip_ver = result->ai_family == AF_INET ? IpVersion::IPv4 :
                   result->ai_family == AF_INET6 ? IpVersion::IPv6 : IpVersion::None;
-    SocketAddress sock_addr = {*result->ai_addr, result->ai_addrlen, ip_ver};
-    addr_ptr = std::make_unique<SocketAddress>(sock_addr);
+    if (ip_ver == IpVersion::None) {
+        success = false;
+    }
+    else {
+        // Had to set it manually, cause we can not fully trust getaddrinfo.
+        addr_ptr = std::make_unique<SocketAddress>();
+        addr_ptr->addrlen = result->ai_addrlen;
+        addr_ptr->ip_version = ip_ver;
+
+        if (ip_ver == IpVersion::IPv4) {
+            addr_ptr->addr_v4.sin_family = AF_INET;
+            addr_ptr->addr_v4.sin_addr =
+                    reinterpret_cast<sockaddr_in*>(result->ai_addr)->sin_addr;
+            addr_ptr->addr_v4.sin_port = htons(port);
+        }
+        else {  // IPv6
+            addr_ptr->addr_v6.sin6_family = AF_INET6;
+            memcpy(&addr_ptr->addr_v6.sin6_addr,
+                   &reinterpret_cast<sockaddr_in6*>(result->ai_addr)->sin6_addr,
+                    sizeof(in6_addr));
+            addr_ptr->addr_v6.sin6_port = htons(port);
+        }
+    }
+
     freeaddrinfo(result);
-    return true;
+    return success;
+}
+
+
+std::string HostAddress::to_string() const noexcept {
+    assert(addr_ptr != nullptr);
+    assert(addr_ptr->ip_version != IpVersion::None);
+
+    std::string result;
+    constexpr std::size_t max_ip_text_length = 64;  // in fact 39, but it does not hurt to give more space
+    result.resize(max_ip_text_length);
+
+    if (addr_ptr->ip_version == IpVersion::IPv4) {
+        auto sockaddr_ptr = reinterpret_cast<sockaddr_in*>(&addr_ptr->addr);
+        if (inet_ntop(AF_INET, &sockaddr_ptr->sin_addr, &result[0], max_ip_text_length) == nullptr) {
+            return "";
+        }
+        result.resize(result.find('\0'));
+        result += ":";
+        result += std::to_string(ntohs(sockaddr_ptr->sin_port));
+        return result;
+    }
+    else {  // IPv6
+        result[0] = '[';
+        auto sockaddr6_ptr = reinterpret_cast<sockaddr_in6*>(&addr_ptr->addr);
+        if (inet_ntop(AF_INET6, &sockaddr6_ptr->sin6_addr, &result[1], max_ip_text_length) == nullptr) {
+            return "";
+        }
+        result.resize(result.find('\0'));
+        result += "]:";
+        result += std::to_string(ntohs(sockaddr6_ptr->sin6_port));
+        return result;
+    }
+}
+
+
+HostAddress::SocketAddress::SocketAddress() noexcept {
+    clear();
+}
+
+void HostAddress::SocketAddress::clear() noexcept {
+    addrlen = std::max(sizeof(addr_v4), sizeof(addr_v6));
+    memset(&addr, 0, addrlen);
+    ip_version = IpVersion::None;
 }

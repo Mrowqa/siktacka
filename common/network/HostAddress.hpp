@@ -19,9 +19,16 @@ public:
     };
 
     struct SocketAddress {
-        sockaddr addr;
+        union {
+            sockaddr addr;
+            sockaddr_in addr_v4;
+            sockaddr_in6 addr_v6;
+        };
         socklen_t addrlen;
         IpVersion ip_version;
+
+        SocketAddress() noexcept;
+        void clear() noexcept;
     };
 
 private:
@@ -30,11 +37,12 @@ private:
 public:
 
     HostAddress() noexcept = default;
-    HostAddress(const std::string &address);
+    HostAddress(const std::string &host, unsigned short port);
 
     void set(const SocketAddress &sock_addr) noexcept;
     const SocketAddress *get() const noexcept;
-    bool resolve(const std::string &address);
+    bool resolve(const std::string &host, unsigned short port);
+    std::string to_string() const noexcept;
 };
 
 

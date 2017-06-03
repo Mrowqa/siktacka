@@ -43,5 +43,5 @@ clean:
 	rm -f $(TARGET) *.o *~ *.bak
 
 remote:
-	scp -r * ${REMOTE_HOST}:${REMOTE_DIR} >/dev/null
-	ssh ${REMOTE_HOST} "(cd ${REMOTE_DIR}; make)"
+	scp -r * '${REMOTE_HOST}':'${REMOTE_DIR}' >/dev/null
+	ssh '${REMOTE_HOST}' "(cd '${REMOTE_DIR}'; make)"

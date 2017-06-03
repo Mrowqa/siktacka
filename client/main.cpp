@@ -4,6 +4,12 @@
 
 
 int main(int argc, char *argv[]) {
-    Client client(argc, argv);
+    try {
+        Client client(argc, argv);
+        client.run();
+    }
+    catch (std::exception &exc) {
+        std::cerr << "Error occured: " << exc.what() << std::endl;
+    }
     return 0;
 }

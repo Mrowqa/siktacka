@@ -4,8 +4,11 @@
 #include <cassert>
 
 
+static constexpr std::size_t chunk_size = 512;
+
+
 Socket::Status TcpSocket::init(HostAddress::IpVersion ip_ver) noexcept {
-    return Socket::init(ip_ver, SOCK_DGRAM);
+    return Socket::init(ip_ver, SOCK_STREAM);
 }
 
 
@@ -28,23 +31,24 @@ Socket::Status TcpSocket::connect(const HostAddress &server_addr) noexcept {
         set_blocking(false);
     }
 
-    return s >= 0 ? Status::Done : get_error_status();
+    return s == 0 ? Status::Done : get_error_status();
 }
 
 
-Socket::Status TcpSocket::send(const std::string &data, std::size_t& sent, std::size_t offset) noexcept {
-    if (data.size() <= offset) {
+Socket::Status TcpSocket::send(const std::string &data, std::size_t& sent) noexcept {
+    if (data.size() <= sent) {
         return Status::Error;
     }
 
     int result = 0;
-    for (sent = offset; sent < data.size(); sent += result) {
+    const auto initial_sent = sent;
+    for (; sent < data.size(); sent += result) {
         result = ::send(sockfd, data.c_str() + sent, data.size() - sent, 0);
 
         if (result < 0) {
             Status status = get_error_status();
 
-            return status == Status::NotReady && sent > offset
+            return status == Status::NotReady && sent > initial_sent
                    ? Status::Partial : status;
         }
     }
@@ -62,9 +66,11 @@ Socket::Status TcpSocket::receive(std::string &buffer, std::size_t buffer_size) 
     if (received > 0) {
         buffer.resize(received);
         return Status::Done;
-    } else if (received == 0) {
+    }
+    else if (received == 0) {
         return Status::Disconnected;
-    } else {
+    }
+    else {
         return get_error_status();
     }
 }
@@ -75,7 +81,7 @@ Socket::Status TcpSocket::send_line(const std::string &data) noexcept {
 
     std::string to_sent = data + "\n";
     do {
-        status = send(to_sent, sent, sent);
+        status = send(to_sent, sent);
     } while (status == Status::Partial);
 
     return status;
@@ -84,7 +90,6 @@ Socket::Status TcpSocket::send_line(const std::string &data) noexcept {
 Socket::Status TcpSocket::receive_line(std::string &buffer) noexcept {
     auto status = Status::Done;
     bool waiting_for_rest_of_command = false;
-    const std::size_t BUFF_SIZE = 256;
     std::string chunk_buffer;
 
     buffer = recv_buffer;
@@ -92,7 +97,7 @@ Socket::Status TcpSocket::receive_line(std::string &buffer) noexcept {
     for (size_t scanned_bytes_cnt = 0;
          buffer.find('\n', scanned_bytes_cnt) == std::string::npos; ) {
         scanned_bytes_cnt = buffer.size();
-        status = receive(chunk_buffer, BUFF_SIZE);
+        status = receive(chunk_buffer, chunk_size);
 
         if (status == Status::NotReady) {
             if (!waiting_for_rest_of_command) {

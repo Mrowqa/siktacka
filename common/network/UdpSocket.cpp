@@ -1,5 +1,7 @@
 #include "UdpSocket.hpp"
 
+#include <cassert>
+
 
 constexpr std::size_t max_datagram_size = 512;
 
@@ -8,13 +10,15 @@ Socket::Status UdpSocket::init(HostAddress::IpVersion ip_ver) noexcept {
     return Socket::init(ip_ver, SOCK_DGRAM);
 }
 
-
+#include <iostream>
 Socket::Status UdpSocket::send(const std::string &data, const HostAddress &dst_addr) noexcept {
+    auto addr_ptr = dst_addr.get();
+    assert(addr_ptr != nullptr);
+
     if (data.size() > max_datagram_size) {
         return Status::Error;
     }
 
-    auto addr_ptr = dst_addr.get();
     int sent = sendto(sockfd, data.c_str(), data.size(), 0,
                       &addr_ptr->addr, addr_ptr->addrlen);
 
@@ -28,6 +32,7 @@ Socket::Status UdpSocket::send(const std::string &data, const HostAddress &dst_a
 
 Socket::Status UdpSocket::receive(std::string &buffer, HostAddress &src_addr) noexcept {
     buffer.resize(max_datagram_size);
+    preallocated_sock_addr.clear();
     preallocated_sock_addr.ip_version = ip_ver;
 
     int bytes_received = recvfrom(sockfd, &buffer[0], max_datagram_size, 0,

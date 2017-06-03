@@ -1,11 +1,8 @@
-//
-// Created by Mrowqa on 2017-06-02.
-//
-
 #ifndef SIKTACKA_UTILS_IMPL_HPP
 #define SIKTACKA_UTILS_IMPL_HPP
 
 
+#include <iostream>
 #include <sstream>
 #include <stdexcept>
 
@@ -22,6 +19,12 @@ T from_string(U &&string) {
     }
 
     return result;
+}
+
+template<typename T>
+void exit_with_error(T &&error_msg) noexcept {
+    std::cerr << std::forward<T>(error_msg) << std::endl;
+    exit(1);
 }
 
 

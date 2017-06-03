@@ -8,11 +8,11 @@ static constexpr auto gui_default_hostname = "localhost";
 static constexpr auto gui_default_port = 12346;
 
 
-Client::Client(int argc, char **argv) noexcept {
+Client::Client(int argc, char *argv[]) noexcept {
     parseArguments(argc, argv);
 }
 
-void Client::parseArguments(int argc, char **argv) noexcept {
+void Client::parseArguments(int argc, char *argv[]) noexcept {
     if (argc < 3 || 4 < argc) {
         std::cerr << "Usage: ./siktacka-client player_name game_server_host[:port] "
                 "[ui_server_host[:port]]\n";

@@ -16,8 +16,8 @@ public:
     UdpSocket() noexcept = default;
 
     Socket::Status init(HostAddress::IpVersion ip_ver) noexcept;
-    Socket::Status send(const std::string& data, const HostAddress& dst_addr) noexcept;
-    Socket::Status receive(std::string& buffer, HostAddress& src_addr) noexcept;
+    Socket::Status send(const std::string &data, const HostAddress &dst_addr) noexcept;
+    Socket::Status receive(std::string &buffer, HostAddress &src_addr) noexcept;
 };
 
 

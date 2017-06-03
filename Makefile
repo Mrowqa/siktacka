@@ -9,12 +9,14 @@ HEADERS = common/network/HostAddress.hpp \
     common/utils_impl.hpp \
     common/network/Socket.hpp \
     common/network/UdpSocket.hpp \
+    common/network/TcpSocket.hpp \
     client/Client.hpp
 
 COMMON_OBJS = common/network/HostAddress.o \
     common/utils.o \
     common/network/Socket.o \
-    common/network/UdpSocket.o
+    common/network/UdpSocket.o \
+    common/network/TcpSocket.o
 SERVER_OBJS = server/main.o \
     $(COMMON_OBJS)
 CLIENT_OBJS = client/main.o \
@@ -41,5 +43,5 @@ clean:
 	rm -f $(TARGET) *.o *~ *.bak
 
 remote:
-	scp -r * loli-citadel:students/sik/zad2/ >/dev/null
-	ssh loli-citadel "(cd students/sik/zad2/; make)"
+	scp -r * ${REMOTE_HOST}:${REMOTE_DIR} >/dev/null
+	ssh ${REMOTE_HOST} "(cd ${REMOTE_DIR}; make)"

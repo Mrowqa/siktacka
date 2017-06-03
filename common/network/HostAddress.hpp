@@ -32,9 +32,9 @@ public:
     HostAddress() noexcept = default;
     HostAddress(const std::string &address);
 
-    void set(const SocketAddress& sock_addr) noexcept;
+    void set(const SocketAddress &sock_addr) noexcept;
     const SocketAddress *get() const noexcept;
-    bool resolve(const std::string& address);
+    bool resolve(const std::string &address);
 };
 
 

@@ -1,11 +1,9 @@
-#ifndef SIKTACKA_CLIENT_HPP
-#define SIKTACKA_CLIENT_HPP
-
+#pragma once
 
 #include <common/network/HostAddress.hpp>
 
 
-class Client {
+class Client final {
 private:
     HostAddress server_address;
     HostAddress gui_address;
@@ -16,8 +14,5 @@ public:
     void run() noexcept;
 
 private:
-    void parse_arguments(int argc, char **argv) noexcept;
+    void parse_arguments(int argc, char *argv[]) noexcept;
 };
-
-
-#endif //SIKTACKA_CLIENT_HPP

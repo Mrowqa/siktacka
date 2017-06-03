@@ -1,6 +1,4 @@
-#ifndef SIKTACKA_UDPSOCKET_HPP
-#define SIKTACKA_UDPSOCKET_HPP
-
+#pragma once
 
 #include <common/network/Socket.hpp>
 
@@ -8,6 +6,7 @@
 extern const std::size_t max_datagram_size;
 
 
+// TODO write comment!
 class UdpSocket final : public Socket {
 private:
     HostAddress::SocketAddress preallocated_sock_addr;
@@ -20,6 +19,3 @@ public:
     // buffer will be resized to fit amount of received data.
     Socket::Status receive(std::string &buffer, HostAddress &src_addr) noexcept;
 };
-
-
-#endif //SIKTACKA_UDPSOCKET_HPP

@@ -1,14 +1,24 @@
 #include "TcpSocket.hpp"
 
-
 #include <cassert>
+#include <netinet/tcp.h>
 
 
 static constexpr std::size_t chunk_size = 512;
 
 
 Socket::Status TcpSocket::init(HostAddress::IpVersion ip_ver) noexcept {
-    return Socket::init(ip_ver, SOCK_STREAM);
+    auto status = Socket::init(ip_ver, SOCK_STREAM);
+    if (status == Status::Done) {
+        // Disable Nagle's algorithm
+        int flag = 1;
+        if (setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY,
+                       (char*) &flag, sizeof(int)) < 0) {
+            return Status::Error;
+        }
+    }
+
+    return status;
 }
 
 

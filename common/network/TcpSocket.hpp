@@ -1,10 +1,9 @@
-#ifndef SIKTACKA_TCPSOCKET_HPP
-#define SIKTACKA_TCPSOCKET_HPP
-
+#pragma once
 
 #include <common/network/Socket.hpp>
 
 
+// TODO write comment!
 class TcpSocket final : public Socket {
 private:
     std::string recv_buffer;
@@ -27,6 +26,3 @@ public:
     Socket::Status send_line(const std::string &data) noexcept;  // blocking operation
     Socket::Status receive_line(std::string &buffer) noexcept;   // blocking operation
 };
-
-
-#endif //SIKTACKA_TCPSOCKET_HPP

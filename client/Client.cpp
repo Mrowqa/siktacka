@@ -1,6 +1,5 @@
 #include "Client.hpp"
-#include <common/network/UdpSocket.hpp>
-#include <common/network/TcpSocket.hpp>
+#include <common/protocol/utils.hpp>
 #include <common/utils.hpp>
 
 #include <iostream>
@@ -28,7 +27,9 @@ void Client::parse_arguments(int argc, char **argv) noexcept {
     }
 
     player_name = argv[1];
-    // TODO validate player_name!
+    if (!validate_player_name(player_name)) {
+        exit_with_error("Invalid player name");
+    }
 
     auto address = with_default_port(argv[2], server_default_port);
     if (!server_address.resolve(address.first, address.second)) {

@@ -1,6 +1,4 @@
-#ifndef SIKTACKA_HOSTADDRESS_HPP
-#define SIKTACKA_HOSTADDRESS_HPP
-
+#pragma once
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -10,6 +8,7 @@
 #include <string>
 
 
+// TODO write comment!
 class HostAddress final {
 public:
     enum class IpVersion {
@@ -18,7 +17,7 @@ public:
         IPv6,
     };
 
-    struct SocketAddress {
+    struct SocketAddress final {
         union {
             sockaddr addr;
             sockaddr_in addr_v4;
@@ -44,6 +43,3 @@ public:
     bool resolve(const std::string &host, unsigned short port);
     std::string to_string() const noexcept;
 };
-
-
-#endif //SIKTACKA_HOSTADDRESS_HPP

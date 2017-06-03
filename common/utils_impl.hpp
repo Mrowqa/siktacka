@@ -1,6 +1,4 @@
-#ifndef SIKTACKA_UTILS_IMPL_HPP
-#define SIKTACKA_UTILS_IMPL_HPP
-
+#pragma once
 
 #include <iostream>
 #include <sstream>
@@ -26,6 +24,3 @@ void exit_with_error(T &&error_msg) noexcept {
     std::cerr << std::forward<T>(error_msg) << std::endl;
     exit(1);
 }
-
-
-#endif //SIKTACKA_UTILS_IMPL_HPP

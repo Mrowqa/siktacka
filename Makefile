@@ -10,13 +10,17 @@ HEADERS = common/network/HostAddress.hpp \
     common/network/Socket.hpp \
     common/network/UdpSocket.hpp \
     common/network/TcpSocket.hpp \
+    common/protocol/HeartBeat.hpp \
+    common/protocol/utils.hpp \
     client/Client.hpp
 
 COMMON_OBJS = common/network/HostAddress.o \
     common/utils.o \
     common/network/Socket.o \
     common/network/UdpSocket.o \
-    common/network/TcpSocket.o
+    common/network/TcpSocket.o \
+    common/protocol/HeartBeat.o \
+    common/protocol/utils.o
 SERVER_OBJS = server/main.o \
     $(COMMON_OBJS)
 CLIENT_OBJS = client/main.o \
@@ -25,8 +29,6 @@ CLIENT_OBJS = client/main.o \
 
 siktacka: $(TARGET)
 all: siktacka
-
-%.cpp: %.hpp
 
 %.o: %.cpp $(HEADERS)
 	$(CC) $(CFLAGS) -c $< -o $@

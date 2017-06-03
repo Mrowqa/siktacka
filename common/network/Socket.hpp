@@ -1,10 +1,9 @@
-#ifndef SIKTACKA_SOCKET_HPP
-#define SIKTACKA_SOCKET_HPP
-
+#pragma once
 
 #include <common/network/HostAddress.hpp>
 
 
+// TODO write comment!
 class Socket {
 protected:
     int sockfd = -1;
@@ -30,6 +29,3 @@ protected:
     Socket::Status get_error_status() const noexcept;
     Socket::Status init(HostAddress::IpVersion ip_ver, int socktype) noexcept;
 };
-
-
-#endif //SIKTACKA_SOCKET_HPP

@@ -2,7 +2,7 @@
 #define SIKTACKA_CLIENT_HPP
 
 
-#include "../common/HostAddress.hpp"
+#include <common/network/HostAddress.hpp>
 
 
 class Client {

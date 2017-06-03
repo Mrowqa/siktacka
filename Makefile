@@ -1,20 +1,20 @@
 TARGET = siktacka-server siktacka-client
 CC = clang++
-CFLAGS = -Wall -Wextra --std=c++14 -O3
+CFLAGS = -Wall -Wextra --std=c++14 -O3 -I.
 LFLAGS = -Wall -Wextra
 
 
-HEADERS = common/HostAddress.hpp \
+HEADERS = common/network/HostAddress.hpp \
     common/utils.hpp \
     common/utils_impl.hpp \
-    common/Socket.hpp \
-    common/UdpSocket.hpp \
+    common/network/Socket.hpp \
+    common/network/UdpSocket.hpp \
     client/Client.hpp
 
-COMMON_OBJS = common/HostAddress.o \
+COMMON_OBJS = common/network/HostAddress.o \
     common/utils.o \
-    common/Socket.o \
-    common/UdpSocket.o
+    common/network/Socket.o \
+    common/network/UdpSocket.o
 SERVER_OBJS = server/main.o \
     $(COMMON_OBJS)
 CLIENT_OBJS = client/main.o \

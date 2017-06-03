@@ -1,5 +1,4 @@
 #include "Socket.hpp"
-#include "HostAddress.hpp"
 
 #include <cassert>
 #include <cerrno>

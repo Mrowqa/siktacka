@@ -4,10 +4,12 @@ project(siktacka)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -O3")
 
-set(SERVER_SOURCE_FILES server/main.cpp common/HostAddress.cpp common/HostAddress.hpp common/utils.hpp common/utils.cpp common/utils_impl.hpp common/Socket.cpp common/Socket.hpp common/UdpSocket.cpp common/UdpSocket.hpp)
+include_directories(".")
+
+set(SERVER_SOURCE_FILES server/main.cpp common/network/HostAddress.cpp common/network/HostAddress.hpp common/utils.hpp common/utils.cpp common/utils_impl.hpp common/network/Socket.cpp common/network/Socket.hpp common/network/UdpSocket.cpp common/network/UdpSocket.hpp common/network/TcpSocket.cpp common/network/TcpSocket.hpp)
 add_executable(siktacka-server ${SERVER_SOURCE_FILES})
 
-set(CLIENT_SOURCE_FILES client/main.cpp common/HostAddress.cpp common/HostAddress.hpp client/Client.cpp client/Client.hpp common/utils.hpp common/utils.cpp common/utils_impl.hpp common/Socket.cpp common/Socket.hpp common/UdpSocket.cpp common/UdpSocket.hpp)
+set(CLIENT_SOURCE_FILES client/main.cpp common/network/HostAddress.cpp common/network/HostAddress.hpp client/Client.cpp client/Client.hpp common/utils.hpp common/utils.cpp common/utils_impl.hpp common/network/Socket.cpp common/network/Socket.hpp common/network/UdpSocket.cpp common/network/UdpSocket.hpp common/network/TcpSocket.cpp common/network/TcpSocket.hpp)
 add_executable(siktacka-client ${CLIENT_SOURCE_FILES})
 
 add_custom_target(siktacka)

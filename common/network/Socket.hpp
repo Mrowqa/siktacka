@@ -2,7 +2,7 @@
 #define SIKTACKA_SOCKET_HPP
 
 
-#include "HostAddress.hpp"
+#include <common/network/HostAddress.hpp>
 
 
 class Socket {

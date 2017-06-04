@@ -34,7 +34,7 @@ public:
         std::size_t serialize_binary(std::string &buf, std::size_t offset) const noexcept;
         bool deserialize_binary(const std::string &data,
                                 std::size_t offset, std::size_t size) noexcept;
-        bool validate(Format fmt) const noexcept;
+        bool validate() const noexcept;
         friend class GameEvent;
     };
 

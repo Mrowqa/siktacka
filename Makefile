@@ -1,7 +1,8 @@
 TARGET = siktacka-server siktacka-client
+EXT_LIBS = -lz
 CC = clang++
 CFLAGS = -Wall -Wextra -Wpedantic --std=c++14 -O3 -I.
-LFLAGS = -Wall -Wextra
+LFLAGS = -Wall -Wextra $(EXT_LIBS)
 
 
 HEADERS = common/network/HostAddress.hpp \

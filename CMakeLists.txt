@@ -3,6 +3,7 @@ project(siktacka)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -O3")
+# missing zlib linkage
 
 include_directories(".")
 

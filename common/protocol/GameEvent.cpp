@@ -4,11 +4,21 @@
 #include <common/utils.hpp>
 
 #include <cassert>
+#include <cstring>
+#include <endian.h>
+#include <zlib.h>
 
 
 // ------------------------------------------------------------------------------------------------
 //                                         GameEvent
 // ------------------------------------------------------------------------------------------------
+static const std::size_t min_size_of_binary_packet =
+        sizeof(uint32_t)     // len
+        + sizeof(uint32_t)   // event_no
+        + sizeof(uint8_t)    // type
+        + sizeof(uint32_t);  // crc32
+
+
 std::string GameEvent::serialize(GameEvent::Format fmt) const noexcept {
     assert(validate(fmt));
 
@@ -21,13 +31,55 @@ bool GameEvent::deserialize(GameEvent::Format fmt, const std::string &data) noex
         throw unimplemented_error("GameEvent: deserialize does not support Format::Text");
     }
 
-    // deserialize... TODO
+    if (data.size() < min_size_of_binary_packet || max_datagram_size < data.size()) {
+        return false;
+    }
+
+    const uint32_t len = *reinterpret_cast<const uint32_t*>(&data[0]);
+    if (data.size() != len + sizeof(uint32_t) * 2) {  // len + event_* + crc32
+        return false;
+    }
+
+    const std::size_t event_offset = 4;
+    const uint32_t crc32_value = crc32(0, reinterpret_cast<const Bytef*>(&data[event_offset]), len);
+    const uint32_t crc32_recvd = be32toh(*reinterpret_cast<const uint32_t*>(&data[event_offset + len]));
+    if (crc32_value != crc32_recvd) {
+        return false;
+    }
+
+    event_no = be32toh(*reinterpret_cast<const uint32_t*>(&data[event_offset]));
+    type = static_cast<Type>(
+            *reinterpret_cast<const uint8_t*>(&data[event_offset + 4]));
+
+    bool success = true;
+    switch (type) {
+        case Type::NewGame:
+            success = new_game_data.deserialize_binary(data, event_offset, len);
+            break;
+
+        case Type::Pixel:
+            success = pixel_data.deserialize_binary(data, event_offset, len);
+            break;
+
+        case Type::PlayerEliminated:
+            success = player_eliminated_data.deserialize_binary(data, event_offset, len);
+            break;
+
+        case Type::GameOver:
+            break;
+
+        default:
+            success = false;
+            break;
+    }
+
+    return success && validate(Format::Binary);
 }
 
 
 bool GameEvent::validate(GameEvent::Format fmt) const noexcept {
     switch (type) {
-        case Type::NewGame:  return new_game_data.validate(fmt);
+        case Type::NewGame:  return new_game_data.validate();
         case Type::Pixel:    return pixel_data.validate(fmt);
         case Type::PlayerEliminated:
                              return player_eliminated_data.validate(fmt);
@@ -38,7 +90,38 @@ bool GameEvent::validate(GameEvent::Format fmt) const noexcept {
 
 
 std::string GameEvent::serialize_binary() const noexcept {
-    return std::string();  // TODO
+    std::string buffer(max_datagram_size, '\0');
+
+    uint32_t len = sizeof(event_no) + sizeof(type);
+    const std::size_t event_offset = sizeof(len);
+    const std::size_t data_field_offset = sizeof(len) + len;
+
+    *reinterpret_cast<uint32_t*>(&buffer[event_offset]) = htobe32(event_no);
+    *reinterpret_cast<uint8_t*> (&buffer[event_offset + 4]) = static_cast<uint8_t>(type);
+    switch (type) {
+        case Type::NewGame:
+            len += new_game_data.serialize_binary(buffer, data_field_offset);
+            break;
+
+        case Type::Pixel:
+            len += pixel_data.serialize_binary(buffer, data_field_offset);
+            break;
+
+        case Type::PlayerEliminated:
+            len += player_eliminated_data.serialize_binary(buffer, data_field_offset);
+            break;
+
+        case Type::GameOver:
+            break;
+    }
+
+    *reinterpret_cast<uint32_t*>(&buffer[0]) = htobe32(len);
+    const uint32_t crc32_value = crc32(0, reinterpret_cast<const Bytef*>(&buffer[event_offset]), len);
+    *reinterpret_cast<uint32_t*>(&buffer[event_offset + len]) = htobe32(crc32_value);
+
+    buffer.resize(event_offset + len + sizeof(crc32_value));
+
+    return buffer;
 }
 
 
@@ -77,12 +160,9 @@ std::string GameEvent::serialize_text() const noexcept {
 // ------------------------------------------------------------------------------------------------
 const std::size_t GameEvent::NewGameData::names_capacity =
         max_datagram_size - (
-                sizeof(uint32_t)        // game_id
-                + sizeof(uint32_t)      // len
-                + sizeof(uint32_t)      // event_no
-                + sizeof(Type)          // type
-                + sizeof(uint32_t) * 2  // max{x,y}
-                + sizeof(uint32_t)      // crc32
+                sizeof(uint32_t)                 // game_id
+                + min_size_of_binary_packet  // len, event_no, type, crc32
+                + sizeof(uint32_t) * 2           // max{x,y}
 );
 
 std::size_t GameEvent::NewGameData::calculate_used_names_capacity() const noexcept {
@@ -97,23 +177,65 @@ std::size_t GameEvent::NewGameData::calculate_used_names_capacity() const noexce
 
 
 std::size_t GameEvent::NewGameData::serialize_binary(std::string &buf, std::size_t offset) const noexcept {
-    // TODO
+    char *const buf_ptr = &buf[offset];
+    *reinterpret_cast<uint32_t*>(buf_ptr) = htobe32(maxx);
+    *reinterpret_cast<uint32_t*>(buf_ptr + 4) = htobe32(maxy);
+
+    auto it = buf_ptr + 8;
+    for (const auto &name : player_names) {
+        memcpy(it, name.data(), name.size());
+        it += name.size();
+        *it++ = '\0';
+    }
+
+    return it - buf_ptr;
 }
 
 
 bool GameEvent::NewGameData::deserialize_binary(const std::string &data, std::size_t offset,
                                                 std::size_t size) noexcept {
-    return false;  // TODO
+    assert(offset + size <= data.length());
+    if (size < 8) {
+        return false;
+    }
+
+    const char *const data_ptr = &data[offset];
+    maxx = be32toh(*reinterpret_cast<const uint32_t*>(data_ptr));
+    maxy = be32toh(*reinterpret_cast<const uint32_t*>(data_ptr + 4));
+
+    player_names.clear();
+    auto it = data_ptr + 8;
+    auto end_it = it;
+    auto const data_end = &data[offset + size];
+
+    while (it < data_end) {
+        while (end_it < data_end && *end_it) {
+            end_it++;
+        }
+
+        if (end_it == data_end) {
+            return false;
+        }
+
+        player_names.emplace_back(it, end_it - it);
+        it = end_it = end_it + 1;
+    }
+
+    return validate();
 }
 
 
-bool GameEvent::NewGameData::validate(GameEvent::Format fmt) const noexcept {
+bool GameEvent::NewGameData::validate() const noexcept {
     if (calculate_used_names_capacity() > names_capacity) {
         return false;
     }
 
+    if (player_names.size() < 2) {
+        return false;
+    }
+
     for (const auto &name : player_names) {
-        if (!validate_player_name(name)) {
+        if (name.empty() || !validate_player_name(name)) {
             return false;
         }
     }
@@ -126,13 +248,28 @@ bool GameEvent::NewGameData::validate(GameEvent::Format fmt) const noexcept {
 //                                     GameEvent::PixelData
 // ------------------------------------------------------------------------------------------------
 std::size_t GameEvent::PixelData::serialize_binary(std::string &buf, std::size_t offset) const noexcept {
-    // TODO
+    char *const buf_ptr = &buf[offset];
+    *reinterpret_cast<uint8_t*>(buf_ptr) = player_no;
+    *reinterpret_cast<uint32_t*>(buf_ptr + 1) = htobe32(x);
+    *reinterpret_cast<uint32_t*>(buf_ptr + 5) = htobe32(y);
+
+    return 9;
 }
 
 
 bool GameEvent::PixelData::deserialize_binary(const std::string &data, std::size_t offset,
                                               std::size_t size) noexcept {
-    return false;  // TODO
+    assert(offset + size <= data.length());
+    if (size != 9) {
+        return false;
+    }
+
+    const char *const data_ptr = &data[offset];
+    player_no = *reinterpret_cast<const uint8_t*>(data_ptr);
+    x = be32toh(*reinterpret_cast<const uint32_t*>(data_ptr + 1));
+    y = be32toh(*reinterpret_cast<const uint32_t*>(data_ptr + 5));
+
+    return true;
 }
 
 
@@ -152,13 +289,22 @@ bool GameEvent::PixelData::validate(GameEvent::Format fmt) const noexcept {
 // ------------------------------------------------------------------------------------------------
 std::size_t GameEvent::PlayerEliminatedData::serialize_binary(
         std::string &buf, std::size_t offset) const noexcept {
-    // TODO
+    *reinterpret_cast<uint8_t*>(&buf[offset]) = player_no;
+
+    return 1;
 }
 
 
 bool GameEvent::PlayerEliminatedData::deserialize_binary(
         const std::string &data, std::size_t offset, std::size_t size) noexcept {
-    return false;  // TODO
+    assert(offset + size <= data.length());
+    if (size != 1) {
+        return false;
+    }
+
+    player_no = *reinterpret_cast<const uint8_t*>(data[offset]);
+
+    return true;
 }
 
 

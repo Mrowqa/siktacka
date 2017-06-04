@@ -11,6 +11,7 @@
 #include <unordered_set>
 
 
+// TODO write comment :v
 class Client final {
 private:
     // command line arguments
@@ -30,6 +31,7 @@ private:
         std::vector<std::string> players_names;
         EventsContainer events;
         uint32_t next_event_no = 0;
+        bool game_over = false;
     } game_state;
 
     // client state
@@ -55,15 +57,18 @@ public:
     void run();
 
 private:
+    // TODO write function for handling socket results with callbacks
     void parse_arguments(int argc, char *argv[]) noexcept;
     void init_client();
     void handle_gui_input();
     bool is_heartbeat_pending() const;
+    void send_heartbeat();
+    void send_updates_to_gui();
+    bool pending_work() const;
+    void receive_events_from_server();
+    void enqueue_event(std::unique_ptr<GameEvent> event_ptr);
+    void process_events();
+    bool validate_game_event(const GameEvent &event);
     // void init_new_game(...) noexcept;
     // is_server_timeouted
-    // validate event ...
-    // send_updates_to_gui
-    // send_heartbeat
-    // receive_server_updates
-    // validate_event
 };

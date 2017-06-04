@@ -44,4 +44,5 @@ public:
     std::string to_string() const noexcept;
 
     bool operator==(const HostAddress &rhs) const noexcept;
+    bool operator!=(const HostAddress &rhs) const noexcept;
 };

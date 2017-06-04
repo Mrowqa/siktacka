@@ -1,5 +1,6 @@
 #include "Client.hpp"
 #include <common/protocol/utils.hpp>
+#include <common/protocol/HeartBeat.hpp>
 #include <common/utils.hpp>
 
 #include <iostream>
@@ -18,6 +19,8 @@ static constexpr long long max_port = 65535;
 
 static constexpr auto heartbeat_interval = 20ms;
 static constexpr auto server_timeout = 1min;
+
+static constexpr auto events_ahead_treshold = 100;
 
 
 static std::pair<std::string, unsigned short> with_default_port(std::string address, unsigned short port);
@@ -56,16 +59,17 @@ void Client::run() {
     init_client();
 
     while (true) {
-        handle_gui_input();
+        handle_gui_input();    // we want to be responsive to input
         if (is_heartbeat_pending()) {
-//            send_heartbeat();
+            send_heartbeat();  // sending heartbeats to server is crucial
         }
-//        send_updates_to_gui();
-//        receive_server_updates();
-//
-//        if (pending_work()) {
-            std::this_thread::sleep_for(0s);
-//        }
+        send_updates_to_gui();  // first, we want inform GUI about all processed events
+        process_events();       // second, we want process all received events
+        receive_events_from_server();  // at last, we want receive new events
+
+        if (pending_work()) {
+            std::this_thread::sleep_for(0s);  // quit current time quantum if no more work
+        }
     }
 }
 
@@ -86,7 +90,10 @@ void Client::init_client() {
         exit_with_error("Failed to make sockets non blocking.");
     }
 
-    client_state.last_server_response = std::chrono::system_clock::now();
+    using namespace std::chrono;
+    client_state.last_server_response = system_clock::now();
+    client_state.session_id = duration_cast<microseconds>(
+            high_resolution_clock::now().time_since_epoch()).count();
 }
 
 
@@ -138,6 +145,173 @@ void Client::handle_gui_input() {
 
 bool Client::is_heartbeat_pending() const {
     return client_state.next_hb_time <= std::chrono::system_clock::now();
+}
+
+
+void Client::send_heartbeat() {
+    HeartBeat hb = {
+            client_state.session_id,
+            -gui_state.left_key_down + gui_state.right_key_down,
+            game_state.next_event_no,
+            player_name
+    };
+
+    if (!hb.validate()) {
+        exit_with_error("Constructed invalid HeartBeat packet.");
+    }
+
+    client_state.next_hb_time = std::chrono::system_clock::now() + heartbeat_interval;
+    auto status = gs_socket.send(hb.serialize(), gs_address);
+    switch (status) {
+        case Socket::Status::Done:
+            break;
+
+        case Socket::Status::NotReady:
+        case Socket::Status::Error:
+            exit_with_error("Game server socket error occurred while sending data.");
+            break;
+
+        case Socket::Status::Disconnected:
+            exit_with_error("Game server disconnected.");
+            break;
+
+        case Socket::Status::Partial:
+        default:
+            assert(false);
+            break;
+    }
+}
+
+
+void Client::send_updates_to_gui() {
+    while (!is_heartbeat_pending()) {
+        if (gui_state.next_event_no == game_state.next_event_no) {
+            return;
+        }
+
+        // move event out of collection; after sending it, we don't need it anymore
+        auto event_ptr = std::move(game_state.events[gui_state.next_event_no]);
+        gui_state.next_event_no++;
+        assert(event_ptr != nullptr);
+        assert(event_ptr->validate(GameEvent::Format::Text));
+
+        auto status = gui_socket.send_line(event_ptr->serialize(GameEvent::Format::Text));
+        switch (status) {
+            case Socket::Status::Done:
+                break;
+
+            case Socket::Status::NotReady:
+            case Socket::Status::Error:
+                exit_with_error("GUI socket error occurred while sending data.");
+                break;
+
+            case Socket::Status::Disconnected:
+                exit_with_error("GUI disconnected.");
+                break;
+
+            case Socket::Status::Partial:
+            default:
+                assert(false);
+                break;
+        }
+    }
+}
+
+
+bool Client::pending_work() const {
+    // TODO check if data awaiting on sockets
+    // TODO check if events to process
+    // TODO check if heartbeat pending
+    return gui_state.next_event_no < game_state.next_event_no;
+}
+
+
+void Client::receive_events_from_server() {
+    std::string buffer;
+    HostAddress src_addr;
+
+    while (!is_heartbeat_pending()) {
+        auto status = gs_socket.receive(buffer, src_addr);
+        switch (status) {
+            case Socket::Status::Done:
+                break;
+
+            case Socket::Status::NotReady:
+                // TODO check timeout here!
+                return;
+                break;
+
+            case Socket::Status::Error:
+                exit_with_error("Game server socket error occurred while receiving data.");
+                break;
+
+            case Socket::Status::Disconnected:
+                exit_with_error("Game server socket disconnected.");
+                break;
+
+            case Socket::Status::Partial:
+            default:
+                assert(false);
+                break;
+        }
+
+        if (src_addr != gs_address) {
+            std::cout << "Info: received data from not-server." << std::endl;
+            continue;
+        }
+
+        auto event_ptr = std::make_unique<GameEvent>();
+        if (!event_ptr->deserialize(GameEvent::Format::Binary, buffer)) {
+            std::cout << "Info: Received malformed data from sever." << std::endl;
+            continue;
+        }
+        assert(event_ptr->validate());
+
+        enqueue_event(std::move(event_ptr));
+    }
+}
+
+
+void Client::enqueue_event(std::unique_ptr<GameEvent> event_ptr) {
+    if (event_ptr->event_no < game_state.next_event_no
+        || game_state.next_event_no + events_ahead_treshold < event_ptr->event_no) {
+        return;
+    }
+
+    if (game_state.events.size() <= event_ptr->event_no) {
+        game_state.events.resize(event_ptr->event_no + 1);
+    }
+
+    if (game_state.events[event_ptr->event_no] != nullptr) {
+        return;
+    }
+
+    game_state.events[event_ptr->event_no] = std::move(event_ptr);
+}
+
+
+void Client::process_events() {
+    while (!is_heartbeat_pending()
+           && game_state.next_event_no < game_state.events.size()
+           && game_state.events[game_state.next_event_no] != nullptr) {
+        auto &event = game_state.events[game_state.next_event_no];
+        game_state.next_event_no++;
+
+        // TODO you stupid kid, YOU ARE RECEIVING MULTIPLE events in one datagram
+        //if (game_state.game_over && event->)
+
+
+        //if (!validate_game_event(*event)) {
+        //    exit_with_error("Received logically invalid packet from server.");
+        //}
+        // check if new game, check if events after game over, etc
+
+    }
+}
+
+
+bool Client::validate_game_event(const GameEvent &event) {
+    return false;
 }
 
 

@@ -131,6 +131,11 @@ bool HostAddress::operator==(const HostAddress &rhs) const noexcept {
 }
 
 
+bool HostAddress::operator!=(const HostAddress &rhs) const noexcept {
+    return !(*this == rhs);
+}
+
+
 HostAddress::SocketAddress::SocketAddress() noexcept {
     clear();
 }

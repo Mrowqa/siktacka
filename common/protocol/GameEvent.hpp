@@ -21,9 +21,9 @@ public:
     };
 
     struct NewGameData final {
-        uint32_t maxx;
-        uint32_t maxy;
-        std::vector<std::string> player_names;
+        uint32_t maxx = 0;
+        uint32_t maxy = 0;
+        std::vector<std::string> players_names;
 
         // How many bytes can be used for player names.
         // Remember about terminating null bytes!
@@ -39,9 +39,9 @@ public:
     };
 
     struct PixelData final {
-        uint8_t player_no;  // only in Format::Binary
-        uint32_t x;
-        uint32_t y;
+        uint8_t player_no = 0;  // only in Format::Binary
+        uint32_t x = 0;
+        uint32_t y = 0;
         std::string player_name;  // only in Format::Text
 
     private:
@@ -53,7 +53,7 @@ public:
     };
 
     struct PlayerEliminatedData final {
-        uint8_t player_no;  // only in Format::Binary
+        uint8_t player_no = 0;  // only in Format::Binary
         std::string player_name;  // only in Format::Text
 
     private:
@@ -64,8 +64,8 @@ public:
         friend class GameEvent;
     };
 
-    uint32_t event_no;
-    Type type;
+    uint32_t event_no = 0;
+    Type type = Type::NewGame;
     // Can not be in union, because we have containers.
     NewGameData new_game_data;
     PixelData pixel_data;

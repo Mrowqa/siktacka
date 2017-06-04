@@ -102,6 +102,35 @@ std::string HostAddress::to_string() const noexcept {
 }
 
 
+bool HostAddress::operator==(const HostAddress &rhs) const noexcept {
+    if (addr_ptr == nullptr) {
+        return rhs.addr_ptr == nullptr;
+    }
+
+    if (rhs.addr_ptr == nullptr) {
+        return false;
+    }
+
+    if (addr_ptr->ip_version != rhs.addr_ptr->ip_version) {
+        return false;
+    }
+
+    switch (addr_ptr->ip_version) {
+        case IpVersion::IPv4:
+            return 0 == memcmp(&addr_ptr->addr_v4, &rhs.addr_ptr->addr_v4, sizeof(addr_ptr->addr_v4));
+            break;
+
+        case IpVersion::IPv6:
+            return 0 == memcmp(&addr_ptr->addr_v6, &rhs.addr_ptr->addr_v6, sizeof(addr_ptr->addr_v6));
+            break;
+
+        case IpVersion::None:
+            return true;
+            break;
+    }
+}
+
+
 HostAddress::SocketAddress::SocketAddress() noexcept {
     clear();
 }

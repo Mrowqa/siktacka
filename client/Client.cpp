@@ -3,6 +3,10 @@
 #include <common/utils.hpp>
 
 #include <iostream>
+#include <cassert>
+#include <thread>
+
+using namespace std::chrono_literals;
 
 
 static constexpr auto server_default_port = 12345;
@@ -11,6 +15,9 @@ static constexpr auto gui_default_port = 12346;
 
 static constexpr long long min_port = 0;
 static constexpr long long max_port = 65535;
+
+static constexpr auto heartbeat_interval = 20ms;
+static constexpr auto server_timeout = 1min;
 
 
 static std::pair<std::string, unsigned short> with_default_port(std::string address, unsigned short port);
@@ -32,10 +39,10 @@ void Client::parse_arguments(int argc, char **argv) noexcept {
     }
 
     auto address = with_default_port(argv[2], server_default_port);
-    if (!server_address.resolve(address.first, address.second)) {
+    if (!gs_address.resolve(address.first, address.second)) {
         exit_with_error("Failed to resolve server address.");
     }
-    std::cout << "Resolved server address as " << server_address.to_string() << std::endl;
+    std::cout << "Resolved server address as " << gs_address.to_string() << std::endl;
 
     address = with_default_port(argc == 4 ? argv[3] : gui_default_hostname, gui_default_port);
     if (!gui_address.resolve(address.first, address.second)) {
@@ -45,8 +52,92 @@ void Client::parse_arguments(int argc, char **argv) noexcept {
 }
 
 
-void Client::run() noexcept {
-    std::cout << "NOP" << std::endl;
+void Client::run() {
+    init_client();
+
+    while (true) {
+        handle_gui_input();
+        if (is_heartbeat_pending()) {
+//            send_heartbeat();
+        }
+//        send_updates_to_gui();
+//        receive_server_updates();
+//
+//        if (pending_work()) {
+            std::this_thread::sleep_for(0s);
+//        }
+    }
+}
+
+
+void Client::init_client() {
+    if (gui_socket.connect(gui_address) != Socket::Status::Done) {
+        exit_with_error("Failed to connect with GUI.");
+    }
+    std::cout << "Connected to GUI." << std::endl;
+
+    if (gs_socket.init(gs_address.get()->ip_version) != Socket::Status::Done) {
+        exit_with_error("Failed to create socket for game server communication.");
+    }
+    std::cout << "Created socket for game server communication." << std::endl;
+
+    if (gui_socket.set_blocking(false) != Socket::Status::Done ||
+            gs_socket.set_blocking(false) != Socket::Status::Done) {
+        exit_with_error("Failed to make sockets non blocking.");
+    }
+
+    client_state.last_server_response = std::chrono::system_clock::now();
+}
+
+
+void Client::handle_gui_input() {
+    std::string buffer;
+
+    while (!is_heartbeat_pending()) {
+        auto status = gui_socket.receive_line(buffer);
+        switch (status) {
+            case Socket::Status::Done:
+                break;
+
+            case Socket::Status::NotReady:
+                return;
+                break;
+
+            case Socket::Status::Error:
+                exit_with_error("GUI socket error occurred while receiving data.");
+                break;
+
+            case Socket::Status::Disconnected:
+                exit_with_error("GUI disconnected.");
+                break;
+
+            case Socket::Status::Partial:
+            default:
+                assert(false);
+                break;
+        }
+
+        if (buffer == "LEFT_KEY_DOWN") {
+            gui_state.left_key_down = true;
+        }
+        else if (buffer == "LEFT_KEY_UP") {
+            gui_state.left_key_down = false;
+        }
+        else if (buffer == "RIGHT_KEY_DOWN") {
+            gui_state.right_key_down = true;
+        }
+        else if (buffer == "RIGHT_KEY_UP") {
+            gui_state.right_key_down = false;
+        }
+        else {
+            std::cout << "Warning: received invalid message from GUI." << std::endl;
+        }
+    }
+}
+
+
+bool Client::is_heartbeat_pending() const {
+    return client_state.next_hb_time <= std::chrono::system_clock::now();
 }
 
 
@@ -88,12 +179,12 @@ std::pair<std::string, unsigned short> with_default_port(std::string address, un
 //#include <cstring>
 //void Client::run() noexcept {
 //    UdpSocket s;
-//    if (s.init(server_address.get()->ip_version) != Socket::Status::Done ||
+//    if (s.init(gs_address.get()->ip_version) != Socket::Status::Done ||
 //        s.set_blocking(true) != Socket::Status::Done) {
 //        exit_with_error("Failed to initialize socket.");
 //    }
-//    /*if (s.init(server_address.get()->ip_version) != Socket::Status::Done ||
-//            s.bind(server_address) != Socket::Status::Done ||
+//    /*if (s.init(gs_address.get()->ip_version) != Socket::Status::Done ||
+//            s.bind(gs_address) != Socket::Status::Done ||
 //            s.set_blocking(true) != Socket::Status::Done) {
 //        exit_with_error("Failed to initialize socket.");
 //    }*/
@@ -116,7 +207,7 @@ std::pair<std::string, unsigned short> with_default_port(std::string address, un
 //    Socket::Status status;
 //    while (true) {
 //        std::cout << "Sending: Hello\n";
-//        status = s.send("Hello\n", server_address);
+//        status = s.send("Hello\n", gs_address);
 //        if (status != Socket::Status::Done) {
 //            std::cout << "status: " << status_to_string(status) << "\n";
 //            std::cout << "errno: " << strerror(errno) << "\n";
@@ -138,12 +229,12 @@ std::pair<std::string, unsigned short> with_default_port(std::string address, un
 //#include <cstring>
 //void Client::run() noexcept {
 //    TcpSocket s;
-//    if (s.connect(server_address) != Socket::Status::Done ||
+//    if (s.connect(gs_address) != Socket::Status::Done ||
 //        s.set_blocking(true) != Socket::Status::Done) {
 //        exit_with_error("Failed to initialize socket.");
 //    }
-//    /*if (s.init(server_address.get()->ip_version) != Socket::Status::Done ||
-//            s.bind(server_address) != Socket::Status::Done ||
+//    /*if (s.init(gs_address.get()->ip_version) != Socket::Status::Done ||
+//            s.bind(gs_address) != Socket::Status::Done ||
 //            s.set_blocking(true) != Socket::Status::Done) {
 //        exit_with_error("Failed to initialize socket.");
 //    }*/

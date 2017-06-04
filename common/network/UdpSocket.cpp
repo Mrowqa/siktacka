@@ -10,7 +10,7 @@ Socket::Status UdpSocket::init(HostAddress::IpVersion ip_ver) noexcept {
     return Socket::init(ip_ver, SOCK_DGRAM);
 }
 
-#include <iostream>
+
 Socket::Status UdpSocket::send(const std::string &data, const HostAddress &dst_addr) noexcept {
     auto addr_ptr = dst_addr.get();
     assert(addr_ptr != nullptr);

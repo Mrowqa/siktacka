@@ -42,4 +42,6 @@ public:
     const SocketAddress *get() const noexcept;
     bool resolve(const std::string &host, unsigned short port);
     std::string to_string() const noexcept;
+
+    bool operator==(const HostAddress &rhs) const noexcept;
 };

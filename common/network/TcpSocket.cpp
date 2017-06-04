@@ -109,12 +109,7 @@ Socket::Status TcpSocket::receive_line(std::string &buffer) noexcept {
         scanned_bytes_cnt = buffer.size();
         status = receive(chunk_buffer, chunk_size);
 
-        if (status == Status::NotReady) {
-            if (!waiting_for_rest_of_command) {
-                break;
-            }
-        }
-        else if (status != Status::Done) {
+        if (status != Status::Done) {
             break;
         }
 
@@ -129,6 +124,7 @@ Socket::Status TcpSocket::receive_line(std::string &buffer) noexcept {
     }
     else if (waiting_for_rest_of_command) {
         recv_buffer = buffer;
+        buffer.clear();
     }
 
     return status;

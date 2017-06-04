@@ -133,7 +133,7 @@ std::string GameEvent::serialize_text() const noexcept {
     switch (type) {
         case Type::NewGame:
             str << "NEW_GAME " << new_game_data.maxx << ' ' << new_game_data.maxy;
-            for (const auto &name : new_game_data.player_names) {
+            for (const auto &name : new_game_data.players_names) {
                 str << ' ' << name;
             }
             break;
@@ -168,7 +168,7 @@ const std::size_t GameEvent::NewGameData::names_capacity =
 std::size_t GameEvent::NewGameData::calculate_used_names_capacity() const noexcept {
     std::size_t result = 0;
 
-    for (const auto &name : player_names) {
+    for (const auto &name : players_names) {
         result += name.size() + 1;
     }
 
@@ -182,7 +182,7 @@ std::size_t GameEvent::NewGameData::serialize_binary(std::string &buf, std::size
     *reinterpret_cast<uint32_t*>(buf_ptr + 4) = htobe32(maxy);
 
     auto it = buf_ptr + 8;
-    for (const auto &name : player_names) {
+    for (const auto &name : players_names) {
         memcpy(it, name.data(), name.size());
         it += name.size();
         *it++ = '\0';
@@ -203,7 +203,7 @@ bool GameEvent::NewGameData::deserialize_binary(const std::string &data, std::si
     maxx = be32toh(*reinterpret_cast<const uint32_t*>(data_ptr));
     maxy = be32toh(*reinterpret_cast<const uint32_t*>(data_ptr + 4));
 
-    player_names.clear();
+    players_names.clear();
     auto it = data_ptr + 8;
     auto end_it = it;
     auto const data_end = &data[offset + size];
@@ -217,7 +217,7 @@ bool GameEvent::NewGameData::deserialize_binary(const std::string &data, std::si
             return false;
         }
 
-        player_names.emplace_back(it, end_it - it);
+        players_names.emplace_back(it, end_it - it);
         it = end_it = end_it + 1;
     }
 
@@ -230,11 +230,11 @@ bool GameEvent::NewGameData::validate() const noexcept {
         return false;
     }
 
-    if (player_names.size() < 2) {
+    if (players_names.size() < 2) {
         return false;
     }
 
-    for (const auto &name : player_names) {
+    for (const auto &name : players_names) {
         if (name.empty() || !validate_player_name(name)) {
             return false;
         }

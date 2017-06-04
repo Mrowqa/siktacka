@@ -7,9 +7,9 @@
 // HeartBeat sent by client to server.
 // Fill fields directly in host bytes order.
 struct HeartBeat final {
-    uint64_t session_id;
-    int8_t turn_direction;
-    uint32_t next_expected_event_no;
+    uint64_t session_id = 0;
+    int8_t turn_direction = 0;
+    uint32_t next_expected_event_no = 0;
     std::string player_name;
 
     // Prepares proper binary packet. Must be called on valid struct.

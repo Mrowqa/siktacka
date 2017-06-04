@@ -23,6 +23,6 @@ public:
 
     // Note: You should use only send/receive or only send_line/receive_line!
     // Note: new line character is being added by send_line and is cut off by receive_line
-    Socket::Status send_line(const std::string &data) noexcept;  // blocking operation
-    Socket::Status receive_line(std::string &buffer) noexcept;   // blocking operation
+    Socket::Status send_line(const std::string &data) noexcept;
+    Socket::Status receive_line(std::string &buffer) noexcept;
 };

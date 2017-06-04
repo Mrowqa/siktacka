@@ -24,8 +24,10 @@ COMMON_OBJS = common/network/HostAddress.o \
     common/protocol/HeartBeat.o \
     common/protocol/GameEvent.o \
     common/protocol/utils.o
+
 SERVER_OBJS = server/main.o \
     $(COMMON_OBJS)
+
 CLIENT_OBJS = client/main.o \
     client/Client.o \
     $(COMMON_OBJS)

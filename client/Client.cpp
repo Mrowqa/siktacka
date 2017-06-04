@@ -68,7 +68,7 @@ std::pair<std::string, unsigned short> with_default_port(std::string address, un
     if (divider_pos < address.length() - 1) {
         try {
             auto port_num = from_string<long long>(address.substr(divider_pos + 1));
-            if (port < min_port || max_port < port) {
+            if (port_num < min_port || max_port < port_num) {
                 exit_with_error("Invalid port number.");
             }
 

@@ -28,7 +28,7 @@ std::string GameEvent::serialize(GameEvent::Format fmt) const noexcept {
 
 bool GameEvent::deserialize(GameEvent::Format fmt, const std::string &data) noexcept {
     if (fmt != GameEvent::Format::Binary) {
-        throw unimplemented_error("GameEvent: deserialize does not support Format::Text");
+        exit_with_error("GameEvent: deserialize does not support Format::Text");
     }
 
     if (data.size() < min_size_of_binary_packet || max_datagram_size < data.size()) {

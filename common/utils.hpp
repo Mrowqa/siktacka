@@ -4,6 +4,7 @@
 #include <stdexcept>
 
 
+// TODO is that deadcode?
 class unimplemented_error : public std::exception {
 public:
     unimplemented_error(const std::string &message);

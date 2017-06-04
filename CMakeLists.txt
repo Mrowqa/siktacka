@@ -6,10 +6,10 @@ set(CMAKE_CXX_FLAGS "-Wall -Wextra -O3")
 
 include_directories(".")
 
-set(SERVER_SOURCE_FILES server/main.cpp common/network/HostAddress.cpp common/network/HostAddress.hpp common/utils.hpp common/utils.cpp common/utils_impl.hpp common/network/Socket.cpp common/network/Socket.hpp common/network/UdpSocket.cpp common/network/UdpSocket.hpp common/network/TcpSocket.cpp common/network/TcpSocket.hpp common/protocol/HeartBeat.cpp common/protocol/HeartBeat.hpp common/protocol/utils.cpp common/protocol/utils.hpp)
+set(SERVER_SOURCE_FILES server/main.cpp common/network/HostAddress.cpp common/network/HostAddress.hpp common/utils.hpp common/utils.cpp common/utils_impl.hpp common/network/Socket.cpp common/network/Socket.hpp common/network/UdpSocket.cpp common/network/UdpSocket.hpp common/network/TcpSocket.cpp common/network/TcpSocket.hpp common/protocol/HeartBeat.cpp common/protocol/HeartBeat.hpp common/protocol/utils.cpp common/protocol/utils.hpp common/protocol/GameEvent.cpp common/protocol/GameEvent.hpp)
 add_executable(siktacka-server ${SERVER_SOURCE_FILES})
 
-set(CLIENT_SOURCE_FILES client/main.cpp common/network/HostAddress.cpp common/network/HostAddress.hpp client/Client.cpp client/Client.hpp common/utils.hpp common/utils.cpp common/utils_impl.hpp common/network/Socket.cpp common/network/Socket.hpp common/network/UdpSocket.cpp common/network/UdpSocket.hpp common/network/TcpSocket.cpp common/network/TcpSocket.hpp common/protocol/HeartBeat.cpp common/protocol/HeartBeat.hpp common/protocol/utils.cpp common/protocol/utils.hpp)
+set(CLIENT_SOURCE_FILES client/main.cpp common/network/HostAddress.cpp common/network/HostAddress.hpp client/Client.cpp client/Client.hpp common/utils.hpp common/utils.cpp common/utils_impl.hpp common/network/Socket.cpp common/network/Socket.hpp common/network/UdpSocket.cpp common/network/UdpSocket.hpp common/network/TcpSocket.cpp common/network/TcpSocket.hpp common/protocol/HeartBeat.cpp common/protocol/HeartBeat.hpp common/protocol/utils.cpp common/protocol/utils.hpp common/protocol/GameEvent.cpp common/protocol/GameEvent.hpp)
 add_executable(siktacka-client ${CLIENT_SOURCE_FILES})
 
 add_custom_target(siktacka)

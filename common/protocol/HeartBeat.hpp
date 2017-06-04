@@ -17,5 +17,6 @@ struct HeartBeat final {
     // Loads binary packet and returns if action succeeded.
     // When error occured, struct fields can be invalidated.
     bool deserialize(const std::string &data) noexcept;
+    // Check if fields contain valid values.
     bool validate() const noexcept;
 };

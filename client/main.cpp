@@ -11,5 +11,9 @@ int main(int argc, char *argv[]) {
     catch (std::exception &exc) {
         std::cerr << "Error occured: " << exc.what() << std::endl;
     }
+    catch (...) {
+        std::cerr << "Unkown error occured." << std::endl;
+    }
+
     return 0;
 }

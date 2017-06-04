@@ -1,5 +1,19 @@
 #pragma once
 
+
+#include <stdexcept>
+
+
+class unimplemented_error : public std::exception {
+public:
+    unimplemented_error(const std::string &message);
+    virtual const char* what() const noexcept;
+
+private:
+    const std::string message;
+};
+
+
 template<typename T, typename U>
 T from_string(U &&string);
 

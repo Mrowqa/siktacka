@@ -125,6 +125,7 @@ bool HostAddress::operator==(const HostAddress &rhs) const noexcept {
             break;
 
         case IpVersion::None:
+        default:
             return true;
             break;
     }

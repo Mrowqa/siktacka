@@ -333,6 +333,12 @@ void Client::process_events() {
                 game_state.maxy = data.maxy;
                 game_state.players_names = data.players_names;
                 game_state.game_over = false;
+
+                std::cout << "New game started. Players: ";
+                for (const auto &name : game_state.players_names) {
+                    std::cout << name << ", ";
+                }
+                std::cout << "\b\b." << std::endl;
                 break;
             }
 
@@ -345,11 +351,13 @@ void Client::process_events() {
             case GameEvent::Type::PlayerEliminated: {
                 auto &data = event->player_eliminated_data;
                 data.player_name = game_state.players_names[data.player_no];
+                std::cout << "Player eliminated: " << data.player_name << "." << std::endl;
                 break;
             }
 
             case GameEvent::Type::GameOver: {
                 game_state.game_over = true;
+                std::cout << "Game is over." << std::endl;
                 break;
             }
 

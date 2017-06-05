@@ -67,7 +67,6 @@ bool MultipleGameEvent::deserialize(const std::string &data) noexcept {
 }
 
 
-// TODO check rest of code if can be simplified with <algorithm>
 bool MultipleGameEvent::validate() const noexcept {
     return std::all_of(events.begin(), events.end(), [](const auto &ev) {
         return ev != nullptr && ev->validate(GameEvent::Format::Binary);

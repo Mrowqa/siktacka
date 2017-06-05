@@ -207,7 +207,7 @@ bool Client::pending_work() const {
         return true;
     }
 
-    // TODO check if data awaiting on sockets
+    // TODO check if data awaiting on sockets (should not make real difference)
 
     return false;
 }

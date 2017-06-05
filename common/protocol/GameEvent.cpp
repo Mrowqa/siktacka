@@ -3,6 +3,7 @@
 #include <common/network/UdpSocket.hpp>
 #include <common/utils.hpp>
 
+#include <algorithm>
 #include <cassert>
 #include <cstring>
 #include <endian.h>
@@ -234,13 +235,9 @@ bool GameEvent::NewGameData::validate() const noexcept {
         return false;
     }
 
-    for (const auto &name : players_names) {
-        if (name.empty() || !validate_player_name(name)) {
-            return false;
-        }
-    }
-
-    return true;
+    return std::all_of(players_names.begin(), players_names.end(), [](const auto &name) {
+        return !name.empty() && validate_player_name(name);
+    });
 }
 
 

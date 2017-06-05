@@ -266,7 +266,8 @@ void Client::handle_newly_received_events(MultipleGameEvent &new_events) {
     auto first_no = new_events.events[0]->event_no;
     for (std::size_t i = 1; i < new_events.events.size(); i++) {
         if (new_events.events[i]->event_no != first_no + i) {
-            exit_with_error("Error: received logically invalid data from server.");
+            exit_with_error(
+                    "Error: received out of order events in one datagram from server.");
         }
     }
 

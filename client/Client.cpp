@@ -1,4 +1,4 @@
-#include "Client.hpp"
+#include <client/Client.hpp>
 #include <common/protocol/utils.hpp>
 #include <common/protocol/HeartBeat.hpp>
 #include <common/utils.hpp>
@@ -69,7 +69,7 @@ void Client::run() {
             send_heartbeat();  // sending heartbeats to server is crucial
         }
 
-        // since we want to balance events processing:
+        // since we want to prevent starvation at single step of events processing:
         send_updates_to_gui();  // first, we want to inform GUI about all processed events
         process_events();       // second, we want to process all received events
         receive_events_from_server();  // at last, we want to receive new events

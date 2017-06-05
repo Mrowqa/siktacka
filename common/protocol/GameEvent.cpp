@@ -1,4 +1,4 @@
-#include "GameEvent.hpp"
+#include <common/protocol/GameEvent.hpp>
 #include <common/protocol/utils.hpp>
 #include <common/network/UdpSocket.hpp>
 #include <common/utils.hpp>

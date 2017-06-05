@@ -1,4 +1,4 @@
-#include "utils.hpp"
+#include <common/protocol/utils.hpp>
 
 
 constexpr std::size_t max_player_name_length = 64;

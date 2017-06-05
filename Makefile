@@ -6,7 +6,6 @@ LFLAGS = -Wall -Wextra $(EXT_LIBS)
 
 
 # TODO normal (release) mode - without asserts
-# TODO #Include<> everywhere! :c
 
 HEADERS = common/network/HostAddress.hpp \
     common/utils.hpp \

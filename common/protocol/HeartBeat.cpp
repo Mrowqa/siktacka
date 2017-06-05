@@ -1,4 +1,4 @@
-#include "HeartBeat.hpp"
+#include <common/protocol/HeartBeat.hpp>
 #include <common/protocol/utils.hpp>
 
 #include <cassert>

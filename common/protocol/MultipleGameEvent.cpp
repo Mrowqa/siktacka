@@ -1,4 +1,4 @@
-#include "MultipleGameEvent.hpp"
+#include <common/protocol/MultipleGameEvent.hpp>
 #include <common/network/UdpSocket.hpp>
 
 #include <cassert>

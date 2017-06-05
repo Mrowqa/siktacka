@@ -55,10 +55,12 @@ bool MultipleGameEvent::deserialize(const std::string &data) noexcept {
         }
 
         auto ev_ptr = std::make_unique<GameEvent>();
-        if (!ev_ptr->deserialize(GameEvent::Format::Binary, data.substr(offset, packet_size))) {
+        if (!ev_ptr->deserialize(GameEvent::Format::Binary,
+                                 data.substr(offset, packet_size))) {
             return false;
         }
 
+        events.emplace_back(std::move(ev_ptr));
         offset += packet_size;
     }
 

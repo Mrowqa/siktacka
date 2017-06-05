@@ -42,8 +42,10 @@ bool GameEvent::deserialize(GameEvent::Format fmt, const std::string &data) noex
     }
 
     const std::size_t event_offset = 4;
-    const uint32_t crc32_value = crc32(0, reinterpret_cast<const Bytef*>(&data[event_offset]), len);
-    const uint32_t crc32_recvd = be32toh(*reinterpret_cast<const uint32_t*>(&data[event_offset + len]));
+    const uint32_t crc32_value = crc32(0, reinterpret_cast<const Bytef*>(&data[0]),
+                                       event_offset + len);
+    const uint32_t crc32_recvd = be32toh(*reinterpret_cast<const uint32_t*>(
+                                         &data[event_offset + len]));
     if (crc32_value != crc32_recvd) {
         return false;
     }
@@ -53,17 +55,21 @@ bool GameEvent::deserialize(GameEvent::Format fmt, const std::string &data) noex
             *reinterpret_cast<const uint8_t*>(&data[event_offset + 4]));
 
     bool success = true;
+    const std::size_t type_data_offset = sizeof(uint32_t) + sizeof(int8_t);
     switch (type) {
         case Type::NewGame:
-            success = new_game_data.deserialize_binary(data, event_offset, len);
+            success = new_game_data.deserialize_binary(
+                    data, event_offset + type_data_offset, len - type_data_offset);
             break;
 
         case Type::Pixel:
-            success = pixel_data.deserialize_binary(data, event_offset, len);
+            success = pixel_data.deserialize_binary(
+                    data, event_offset + type_data_offset, len - type_data_offset);
             break;
 
         case Type::PlayerEliminated:
-            success = player_eliminated_data.deserialize_binary(data, event_offset, len);
+            success = player_eliminated_data.deserialize_binary(
+                    data, event_offset + type_data_offset, len - type_data_offset);
             break;
 
         case Type::GameOver:
@@ -117,7 +123,8 @@ std::string GameEvent::serialize_binary() const noexcept {
     }
 
     *reinterpret_cast<uint32_t*>(&buffer[0]) = htobe32(len);
-    const uint32_t crc32_value = crc32(0, reinterpret_cast<const Bytef*>(&buffer[event_offset]), len);
+    const uint32_t crc32_value = crc32(0, reinterpret_cast<const Bytef*>(&buffer[0]),
+                                       event_offset + len);
     *reinterpret_cast<uint32_t*>(&buffer[event_offset + len]) = htobe32(crc32_value);
 
     buffer.resize(event_offset + len + sizeof(crc32_value));
@@ -299,7 +306,7 @@ bool GameEvent::PlayerEliminatedData::deserialize_binary(
         return false;
     }
 
-    player_no = *reinterpret_cast<const uint8_t*>(data[offset]);
+    player_no = *reinterpret_cast<const uint8_t*>(&data[offset]);
 
     return true;
 }

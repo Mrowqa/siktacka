@@ -182,8 +182,11 @@ void Client::send_updates_to_gui() {
         auto event_ptr = std::move(game_state.events[gui_state.next_event_no]);
         gui_state.next_event_no++;
         assert(event_ptr != nullptr);
-        assert(event_ptr->validate(GameEvent::Format::Text));
+        if (event_ptr->type == GameEvent::Type::GameOver) {
+            continue;
+        }
 
+        assert(event_ptr->validate(GameEvent::Format::Text));
         auto data = event_ptr->serialize(GameEvent::Format::Text);
 
         auto data_sent = handle_socket_io([&data, this]() {
@@ -323,12 +326,35 @@ void Client::process_events() {
         }
 
         // process new game event
-        if (event->type == GameEvent::Type::NewGame) {
-            auto &data = event->new_game_data;
-            game_state.maxx = data.maxx;
-            game_state.maxy = data.maxy;
-            game_state.players_names = data.players_names;
-            game_state.game_over = false;
+        switch (event->type) {
+            case GameEvent::Type::NewGame: {
+                auto &data = event->new_game_data;
+                game_state.maxx = data.maxx;
+                game_state.maxy = data.maxy;
+                game_state.players_names = data.players_names;
+                game_state.game_over = false;
+                break;
+            }
+
+            case GameEvent::Type::Pixel: {
+                auto &data = event->pixel_data;
+                data.player_name = game_state.players_names[data.player_no];
+                break;
+            }
+
+            case GameEvent::Type::PlayerEliminated: {
+                auto &data = event->player_eliminated_data;
+                data.player_name = game_state.players_names[data.player_no];
+                break;
+            }
+
+            case GameEvent::Type::GameOver: {
+                game_state.game_over = true;
+                break;
+            }
+
+            default:
+                break;
         }
     }
 }

@@ -7,7 +7,8 @@
 #include <memory>
 
 
-// TODO comment
+// Class for convenient serializing and deserializing
+// multiple game events with game_id.
 class MultipleGameEvent {
 public:
     using Container = std::deque<std::unique_ptr<GameEvent>>;

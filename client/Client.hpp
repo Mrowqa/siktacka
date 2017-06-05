@@ -11,7 +11,7 @@
 #include <unordered_set>
 
 
-// TODO write comment :v
+// Main class for siktacka-client
 class Client final {
 private:
     // command line arguments
@@ -67,6 +67,6 @@ private:
     void init_new_game(uint32_t new_game_id);
     void enqueue_events(MultipleGameEvent &events);
     void process_events();
-    // Returns empty string on success, contains error if present.
+    // Returns empty string on success, otherwise error message.
     std::string validate_game_event(const GameEvent &event);
 };

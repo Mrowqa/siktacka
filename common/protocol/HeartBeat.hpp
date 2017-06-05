@@ -5,7 +5,7 @@
 
 
 // HeartBeat sent by client to server.
-// Fill fields directly in host bytes order.
+// Class for convenient serializing and deserializing packets.
 struct HeartBeat final {
     uint64_t session_id = 0;
     int8_t turn_direction = 0;

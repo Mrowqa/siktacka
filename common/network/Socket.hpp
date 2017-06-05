@@ -3,7 +3,7 @@
 #include <common/network/HostAddress.hpp>
 
 
-// TODO write comment!
+// Base class for sockets.
 class Socket {
 protected:
     int sockfd = -1;
@@ -13,7 +13,7 @@ public:
     enum class Status {
         Done,
         NotReady,
-        Partial,
+        Partial,  // only when partial data have been sent
         Disconnected,
         Error,
     };
@@ -22,6 +22,7 @@ public:
 
     Socket::Status set_blocking(bool block) const noexcept;
     bool is_blocking() const noexcept;
+    // must not be called before init() in derived classes
     Socket::Status bind(const HostAddress& host_addr) const noexcept;
 
 protected:

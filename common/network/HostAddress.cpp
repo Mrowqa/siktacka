@@ -45,7 +45,7 @@ bool HostAddress::resolve(const std::string &host, unsigned short port) {
     }
     else {
         // Had to set it manually, cause we can not fully trust getaddrinfo.
-        // TODO refactor to use getaddrinfo
+        // TODO refactor to fully trust getaddrinfo, again (second arg & result)
         addr_ptr = std::make_unique<SocketAddress>();
         addr_ptr->addrlen = result->ai_addrlen;
         addr_ptr->ip_version = ip_ver;

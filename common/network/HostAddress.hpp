@@ -8,7 +8,8 @@
 #include <string>
 
 
-// TODO write comment!
+// Class representing full address (IP & port number).
+// It can also resolve name to IP.
 class HostAddress final {
 public:
     enum class IpVersion {
@@ -22,11 +23,13 @@ public:
             sockaddr addr;
             sockaddr_in addr_v4;
             sockaddr_in6 addr_v6;
-        };
+        }; // because they have different sizes
         socklen_t addrlen;
         IpVersion ip_version;
 
         SocketAddress() noexcept;
+        // fills addr_* (union) with null bytes, sets addrlen to max possible size
+        // and sets ip_version to None.
         void clear() noexcept;
     };
 
@@ -38,9 +41,15 @@ public:
     HostAddress() noexcept = default;
     HostAddress(const std::string &host, unsigned short port);
 
+    // sets new socket address
     void set(const SocketAddress &sock_addr) noexcept;
+    // returns pointer to SocketAddress if present, nullptr otherwise
     const SocketAddress *get() const noexcept;
+    // resolves hostname and port to SocketAddress and returns true if succeeded
+    // sets nullptr on fail
     bool resolve(const std::string &host, unsigned short port);
+    // returns string representation of address
+    // must not be called when get() == nullptr
     std::string to_string() const noexcept;
 
     bool operator==(const HostAddress &rhs) const noexcept;

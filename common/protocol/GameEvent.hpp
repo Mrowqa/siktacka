@@ -5,7 +5,7 @@
 #include <vector>
 
 
-// TODO comment here.
+// Class for convenient serializing and deserializing game events.
 class GameEvent final {
 public:
     enum class Type : uint8_t {
@@ -66,7 +66,7 @@ public:
 
     uint32_t event_no = 0;
     Type type = Type::NewGame;
-    // Can not be in union, because we have containers.
+    // Can not be in union, because they contain C++ objects with internal states.
     NewGameData new_game_data;
     PixelData pixel_data;
     PlayerEliminatedData player_eliminated_data;

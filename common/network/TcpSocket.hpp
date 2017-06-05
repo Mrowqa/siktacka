@@ -3,10 +3,9 @@
 #include <common/network/Socket.hpp>
 
 
-// TODO write comment!
 class TcpSocket final : public Socket {
 private:
-    std::string recv_buffer;
+    std::string recv_buffer;  // internal buffer for keeping not full line in receive_line()
 
 public:
     TcpSocket() noexcept = default;

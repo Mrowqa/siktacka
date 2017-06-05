@@ -63,11 +63,17 @@ void Client::parse_arguments(int argc, char **argv) noexcept {
 void Client::run() {
     init_client();
 
+    // Note: all functions does their work in loop until they finish or heartbeat is pending
     while (true) {
-        handle_gui_input();    // we want to be responsive to input
         if (is_heartbeat_pending()) {
             send_heartbeat();  // sending heartbeats to server is crucial
         }
+        handle_gui_input();    // we want to be responsive to input
+
+        // second part -> in case when GUI is malicious and sends as too many data...
+        if (is_heartbeat_pending()) {
+            send_heartbeat();
+        } // and now following functions will have some time
 
         // since we want to prevent starvation at single step of events processing:
         send_updates_to_gui();  // first, we want to inform GUI about all processed events
@@ -228,6 +234,7 @@ void Client::receive_events_from_server() {
             if (client_state.last_server_response + game_server_timeout < now) {
                 exit_with_error("Game server time out.");
             }
+            continue;
         }
 
         if (src_addr != gs_address) {
@@ -237,7 +244,7 @@ void Client::receive_events_from_server() {
 
         MultipleGameEvent new_events;
         if (!new_events.deserialize(buffer)) {
-            std::cout << "Info: Received malformed data from sever." << std::endl;
+            std::cout << "Info: Received malformed data from server." << std::endl;
             continue;
         }
 

@@ -6,19 +6,17 @@
 #include <endian.h>
 
 
-static constexpr auto header_size = sizeof(HeartBeat) - sizeof(std::string);
+static constexpr auto header_size = sizeof(uint64_t) + sizeof(int8_t) + sizeof(uint32_t);
 
 
 std::string HeartBeat::serialize() const noexcept {
     assert(validate());
     std::string buffer(header_size + player_name.size(), '\0');
 
-    // Simple way to generate binary packet in network byte order.
-    auto buf_ptr = reinterpret_cast<HeartBeat*>(&buffer[0]);
-    buf_ptr->session_id = htobe64(session_id);
-    buf_ptr->turn_direction = turn_direction;
-    buf_ptr->next_expected_event_no = htobe32(next_expected_event_no);
-    memcpy(&buf_ptr->player_name, &player_name[0], player_name.size());
+    *reinterpret_cast<uint64_t*>(&buffer[0]) = htobe64(session_id);
+    *reinterpret_cast<uint8_t*> (&buffer[8]) = turn_direction;
+    *reinterpret_cast<uint32_t*>(&buffer[9]) = htobe32(next_expected_event_no);
+    memcpy(&buffer[13], &player_name[0], player_name.size());
 
     return buffer;
 }
@@ -29,14 +27,13 @@ bool HeartBeat::deserialize(const std::string &data) noexcept {
         return false;
     }
 
-    auto data_ptr = reinterpret_cast<const HeartBeat*>(&data[0]);
-    session_id = be64toh(data_ptr->session_id);
-    turn_direction = data_ptr->turn_direction;
-    next_expected_event_no = be32toh(data_ptr->next_expected_event_no);
+    session_id = be64toh(*reinterpret_cast<const uint64_t*>(&data[0]));
+    turn_direction = *reinterpret_cast<const uint8_t*>(&data[8]);
+    next_expected_event_no = be32toh(*reinterpret_cast<const uint32_t*>(&data[9]));
 
     auto player_name_length = data.length() - header_size;
     player_name.resize(player_name_length);
-    memcpy(&player_name[0], &data_ptr->player_name, player_name_length);
+    memcpy(&player_name[0], &data[13], player_name_length);
 
     return validate();
 }

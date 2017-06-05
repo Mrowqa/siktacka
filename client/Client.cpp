@@ -21,6 +21,7 @@ static constexpr auto heartbeat_interval = 20ms;
 static constexpr auto server_timeout = 1min;
 
 static constexpr auto events_ahead_treshold = 100;
+// TODO timeout for "previous events"
 
 
 static std::pair<std::string, unsigned short> with_default_port(std::string address, unsigned short port);
@@ -63,11 +64,13 @@ void Client::run() {
         if (is_heartbeat_pending()) {
             send_heartbeat();  // sending heartbeats to server is crucial
         }
-        send_updates_to_gui();  // first, we want inform GUI about all processed events
-        process_events();       // second, we want process all received events
-        receive_events_from_server();  // at last, we want receive new events
 
-        if (pending_work()) {
+        // since we want to balance events processing:
+        send_updates_to_gui();  // first, we want to inform GUI about all processed events
+        process_events();       // second, we want to process all received events
+        receive_events_from_server();  // at last, we want to receive new events
+
+        if (!pending_work()) {
             std::this_thread::sleep_for(0s);  // quit current time quantum if no more work
         }
     }
@@ -149,11 +152,14 @@ bool Client::is_heartbeat_pending() const {
 
 
 void Client::send_heartbeat() {
+    auto turn_direction = static_cast<int8_t>(
+            (gui_state.left_key_down ? -1 : 0) + (gui_state.right_key_down ? 1 : 0));
+
     HeartBeat hb = {
             client_state.session_id,
-            -gui_state.left_key_down + gui_state.right_key_down,
+            turn_direction,
             game_state.next_event_no,
-            player_name
+            player_name,
     };
 
     if (!hb.validate()) {
@@ -166,7 +172,7 @@ void Client::send_heartbeat() {
         case Socket::Status::Done:
             break;
 
-        case Socket::Status::NotReady:
+        case Socket::Status::NotReady: // TODO try some times
         case Socket::Status::Error:
             exit_with_error("Game server socket error occurred while sending data.");
             break;
@@ -200,7 +206,7 @@ void Client::send_updates_to_gui() {
             case Socket::Status::Done:
                 break;
 
-            case Socket::Status::NotReady:
+            case Socket::Status::NotReady: // TODO try some times
             case Socket::Status::Error:
                 exit_with_error("GUI socket error occurred while sending data.");
                 break;
@@ -260,33 +266,58 @@ void Client::receive_events_from_server() {
             continue;
         }
 
-        auto event_ptr = std::make_unique<GameEvent>();
-        if (!event_ptr->deserialize(GameEvent::Format::Binary, buffer)) {
+        MultipleGameEvent new_events;
+        if (!new_events.deserialize(buffer)) {
             std::cout << "Info: Received malformed data from sever." << std::endl;
             continue;
         }
-        assert(event_ptr->validate());
 
-        enqueue_event(std::move(event_ptr));
+        handle_newly_received_events(new_events);
     }
 }
 
 
-void Client::enqueue_event(std::unique_ptr<GameEvent> event_ptr) {
-    if (event_ptr->event_no < game_state.next_event_no
-        || game_state.next_event_no + events_ahead_treshold < event_ptr->event_no) {
+void Client::handle_newly_received_events(MultipleGameEvent &new_events) {
+    if (client_state.prev_game_ids.count(new_events.game_id) > 0) {
         return;
     }
 
-    if (game_state.events.size() <= event_ptr->event_no) {
-        game_state.events.resize(event_ptr->event_no + 1);
+    // Check events number
+    auto first_no = new_events.events[0]->event_no;
+    for (std::size_t i = 1; i < new_events.events.size(); i++) {
+        if (new_events.events[i]->event_no != first_no + i) {
+            exit_with_error("Error: received logically invalid data from server.");
+        }
     }
 
-    if (game_state.events[event_ptr->event_no] != nullptr) {
+    if (new_events.game_id != client_state.game_id) {
+        // init new game TODO
+    }
+
+    enqueue_events(new_events);
+}
+
+
+void Client::enqueue_events(MultipleGameEvent &events) {
+    auto &first_ev_ptr = events.events.front();
+    auto &last_ev_ptr = events.events.back();
+
+    if (last_ev_ptr->event_no < game_state.next_event_no
+        || game_state.next_event_no + events_ahead_treshold < first_ev_ptr->event_no) {
         return;
     }
 
-    game_state.events[event_ptr->event_no] = std::move(event_ptr);
+    if (game_state.events.size() <= last_ev_ptr->event_no) {
+        game_state.events.resize(last_ev_ptr->event_no + 1);
+    }
+
+    for (auto &ev_ptr : events.events) {
+        if (game_state.events[ev_ptr->event_no] != nullptr) {
+            continue;
+        }
+
+        game_state.events[ev_ptr->event_no] = std::move(ev_ptr);
+    }
 }
 
 
@@ -297,6 +328,8 @@ void Client::process_events() {
         auto &event = game_state.events[game_state.next_event_no];
         game_state.next_event_no++;
 
+        // crash if events after game over
+        // crash if first events is not NEW_GAME
         // TODO you stupid kid, YOU ARE RECEIVING MULTIPLE events in one datagram
         //if (game_state.game_over && event->)
 

@@ -73,8 +73,8 @@ public:
 
     // Prepares proper packet. Must be called on valid struct.
     std::string serialize(Format fmt) const noexcept;
-    // Loads packet and returns if action succeeded.
-    // When error occured, struct fields can be invalidated.
+    // Loads packet and returns true if action succeeded.
+    // When error occurred, struct fields can be invalidated.
     bool deserialize(Format fmt, const std::string &data) noexcept;
     // Check if fields contain valid values.
     bool validate(Format fmt) const noexcept;

@@ -3,7 +3,7 @@
 #include <common/network/HostAddress.hpp>
 #include <common/network/TcpSocket.hpp>
 #include <common/network/UdpSocket.hpp>
-#include <common/protocol/GameEvent.hpp>
+#include <common/protocol/MultipleGameEvent.hpp>
 
 #include <chrono>
 #include <deque>
@@ -25,11 +25,9 @@ private:
 
     // game state
     struct {
-        using EventsContainer = std::deque<std::unique_ptr<GameEvent>>;
-
         uint32_t maxx = 0, maxy = 0;
         std::vector<std::string> players_names;
-        EventsContainer events;
+        MultipleGameEvent::Container events;
         uint32_t next_event_no = 0;
         bool game_over = false;
     } game_state;
@@ -57,6 +55,7 @@ public:
     void run();
 
 private:
+    // TODO grep on reinterpret_cast -- check endian conversions
     // TODO write function for handling socket results with callbacks
     void parse_arguments(int argc, char *argv[]) noexcept;
     void init_client();
@@ -66,7 +65,8 @@ private:
     void send_updates_to_gui();
     bool pending_work() const;
     void receive_events_from_server();
-    void enqueue_event(std::unique_ptr<GameEvent> event_ptr);
+    void handle_newly_received_events(MultipleGameEvent &new_events);
+    void enqueue_events(MultipleGameEvent &events);
     void process_events();
     bool validate_game_event(const GameEvent &event);
     // void init_new_game(...) noexcept;

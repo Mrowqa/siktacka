@@ -55,8 +55,6 @@ public:
     void run();
 
 private:
-    // TODO grep on reinterpret_cast -- check endian conversions
-    // TODO write function for handling socket results with callbacks
     void parse_arguments(int argc, char *argv[]) noexcept;
     void init_client();
     void handle_gui_input();
@@ -66,9 +64,9 @@ private:
     bool pending_work() const;
     void receive_events_from_server();
     void handle_newly_received_events(MultipleGameEvent &new_events);
+    void init_new_game(uint32_t new_game_id);
     void enqueue_events(MultipleGameEvent &events);
     void process_events();
-    bool validate_game_event(const GameEvent &event);
-    // void init_new_game(...) noexcept;
-    // is_server_timeouted
+    // Returns empty string on success, contains error if present.
+    std::string validate_game_event(const GameEvent &event);
 };

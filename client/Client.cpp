@@ -18,13 +18,17 @@ static constexpr long long min_port = 0;
 static constexpr long long max_port = 65535;
 
 static constexpr auto heartbeat_interval = 20ms;
-static constexpr auto server_timeout = 1min;
+static constexpr auto game_server_timeout = 1min;
 
 static constexpr auto events_ahead_treshold = 100;
-// TODO timeout for "previous events"
+// TODO timeout for "previous events" (received event_no=X, but not X-1)
+
+static constexpr auto socket_send_io_max_tries = 3;
 
 
 static std::pair<std::string, unsigned short> with_default_port(std::string address, unsigned short port);
+template<typename T, typename U, typename V>
+static bool handle_socket_io(T op, U &&sock_name, V &&action, int tries_cnt = 1);
 
 
 Client::Client(int argc, char *argv[]) noexcept {
@@ -104,27 +108,12 @@ void Client::handle_gui_input() {
     std::string buffer;
 
     while (!is_heartbeat_pending()) {
-        auto status = gui_socket.receive_line(buffer);
-        switch (status) {
-            case Socket::Status::Done:
-                break;
+        auto data_received = handle_socket_io([&buffer, this]() {
+            return gui_socket.receive_line(buffer);
+        }, "GUI", "receiving");
 
-            case Socket::Status::NotReady:
-                return;
-                break;
-
-            case Socket::Status::Error:
-                exit_with_error("GUI socket error occurred while receiving data.");
-                break;
-
-            case Socket::Status::Disconnected:
-                exit_with_error("GUI disconnected.");
-                break;
-
-            case Socket::Status::Partial:
-            default:
-                assert(false);
-                break;
+        if (!data_received) {
+            return;
         }
 
         if (buffer == "LEFT_KEY_DOWN") {
@@ -167,24 +156,12 @@ void Client::send_heartbeat() {
     }
 
     client_state.next_hb_time = std::chrono::system_clock::now() + heartbeat_interval;
-    auto status = gs_socket.send(hb.serialize(), gs_address);
-    switch (status) {
-        case Socket::Status::Done:
-            break;
+    auto data_sent = handle_socket_io([&hb, this]() {
+        return this->gs_socket.send(hb.serialize(), this->gs_address);
+    }, "Game server", "sending", socket_send_io_max_tries);
 
-        case Socket::Status::NotReady: // TODO try some times
-        case Socket::Status::Error:
-            exit_with_error("Game server socket error occurred while sending data.");
-            break;
-
-        case Socket::Status::Disconnected:
-            exit_with_error("Game server disconnected.");
-            break;
-
-        case Socket::Status::Partial:
-        default:
-            assert(false);
-            break;
+    if (!data_sent) {
+        exit_with_error("Failed to sent data to game server (tried some times).");
     }
 }
 
@@ -201,34 +178,38 @@ void Client::send_updates_to_gui() {
         assert(event_ptr != nullptr);
         assert(event_ptr->validate(GameEvent::Format::Text));
 
-        auto status = gui_socket.send_line(event_ptr->serialize(GameEvent::Format::Text));
-        switch (status) {
-            case Socket::Status::Done:
-                break;
+        auto data = event_ptr->serialize(GameEvent::Format::Text);
 
-            case Socket::Status::NotReady: // TODO try some times
-            case Socket::Status::Error:
-                exit_with_error("GUI socket error occurred while sending data.");
-                break;
+        auto data_sent = handle_socket_io([&data, this]() {
+            return this->gui_socket.send_line(data);
+        }, "GUI", "sending", socket_send_io_max_tries);
 
-            case Socket::Status::Disconnected:
-                exit_with_error("GUI disconnected.");
-                break;
-
-            case Socket::Status::Partial:
-            default:
-                assert(false);
-                break;
+        if (!data_sent) {
+            exit_with_error("Failed to sent data to GUI (tried some times).");
         }
     }
 }
 
 
 bool Client::pending_work() const {
+    if (is_heartbeat_pending()) {
+        return true;
+    }
+
+    // pending updates to be sent to GUI
+    if (gui_state.next_event_no < game_state.next_event_no) {
+        return true;
+    }
+
+    // pending events to be processed
+    if (game_state.next_event_no < game_state.events.size()
+            && game_state.events[game_state.next_event_no] != nullptr) {
+        return true;
+    }
+
     // TODO check if data awaiting on sockets
-    // TODO check if events to process
-    // TODO check if heartbeat pending
-    return gui_state.next_event_no < game_state.next_event_no;
+
+    return false;
 }
 
 
@@ -237,28 +218,16 @@ void Client::receive_events_from_server() {
     HostAddress src_addr;
 
     while (!is_heartbeat_pending()) {
-        auto status = gs_socket.receive(buffer, src_addr);
-        switch (status) {
-            case Socket::Status::Done:
-                break;
+        auto now = std::chrono::system_clock::now();
 
-            case Socket::Status::NotReady:
-                // TODO check timeout here!
-                return;
-                break;
+        auto data_received = handle_socket_io([&buffer, &src_addr, this]() {
+            return this->gs_socket.receive(buffer, src_addr);
+        }, "Game server", "receiving");
 
-            case Socket::Status::Error:
-                exit_with_error("Game server socket error occurred while receiving data.");
-                break;
-
-            case Socket::Status::Disconnected:
-                exit_with_error("Game server socket disconnected.");
-                break;
-
-            case Socket::Status::Partial:
-            default:
-                assert(false);
-                break;
+        if (!data_received) {
+            if (client_state.last_server_response + game_server_timeout < now) {
+                exit_with_error("Game server time out.");
+            }
         }
 
         if (src_addr != gs_address) {
@@ -272,6 +241,7 @@ void Client::receive_events_from_server() {
             continue;
         }
 
+        client_state.last_server_response = now;
         handle_newly_received_events(new_events);
     }
 }
@@ -291,10 +261,22 @@ void Client::handle_newly_received_events(MultipleGameEvent &new_events) {
     }
 
     if (new_events.game_id != client_state.game_id) {
-        // init new game TODO
+        init_new_game(new_events.game_id);
     }
 
     enqueue_events(new_events);
+}
+
+
+void Client::init_new_game(uint32_t new_game_id) {
+    client_state.prev_game_ids.insert(client_state.game_id);
+    client_state.game_id = new_game_id;
+
+    game_state.maxx = game_state.maxy = 0;
+    game_state.players_names.clear();
+    game_state.events.clear();
+    game_state.game_over = false;
+    game_state.next_event_no = gui_state.next_event_no = 0;
 }
 
 
@@ -328,23 +310,60 @@ void Client::process_events() {
         auto &event = game_state.events[game_state.next_event_no];
         game_state.next_event_no++;
 
-        // crash if events after game over
-        // crash if first events is not NEW_GAME
-        // TODO you stupid kid, YOU ARE RECEIVING MULTIPLE events in one datagram
-        //if (game_state.game_over && event->)
+        auto error_msg = validate_game_event(*event);
+        if (!error_msg.empty()) {
+            exit_with_error(std::move(error_msg));
+        }
 
-
-        //if (!validate_game_event(*event)) {
-        //    exit_with_error("Received logically invalid packet from server.");
-        //}
-        // check if new game, check if events after game over, etc
-
+        // process new game event
+        if (event->type == GameEvent::Type::NewGame) {
+            auto &data = event->new_game_data;
+            game_state.maxx = data.maxx;
+            game_state.maxy = data.maxy;
+            game_state.players_names = data.players_names;
+            game_state.game_over = false;
+        }
     }
 }
 
 
-bool Client::validate_game_event(const GameEvent &event) {
-    return false;
+std::string Client::validate_game_event(const GameEvent &event) {
+    if (event.event_no == 0 && event.type != GameEvent::Type::NewGame) {
+        return "Server error: first game event is not NewGame.";
+    }
+
+    if (event.event_no > 0 && event.type == GameEvent::Type::NewGame) {
+        return "Server error: got NewGame event with id != 0.";
+    }
+
+    if (game_state.game_over) {
+        return "Server error: got event after game over.";
+    }
+
+    switch (event.type) {
+        case GameEvent::Type::NewGame:
+            break;
+
+        case GameEvent::Type::Pixel:
+            if (event.pixel_data.player_no >= game_state.players_names.size()) {
+                return "Server error: got player_no higher than number of players.";
+            }
+            if (event.pixel_data.x >= game_state.maxx || event.pixel_data.y >= game_state.maxy) {
+                return "Server error: got pixel outside the map.";
+            }
+            break;
+
+        case GameEvent::Type::PlayerEliminated:
+            if (event.player_eliminated_data.player_no >= game_state.players_names.size()) {
+                return "Server error: got player_no higher than number of players.";
+            }
+            break;
+
+        case GameEvent::Type::GameOver:
+            break;
+    }
+
+    return "";
 }
 
 
@@ -381,106 +400,41 @@ std::pair<std::string, unsigned short> with_default_port(std::string address, un
 }
 
 
-// --------------------------- TODO delete it! -- trash code --------------
-//#include <cerrno>
-//#include <cstring>
-//void Client::run() noexcept {
-//    UdpSocket s;
-//    if (s.init(gs_address.get()->ip_version) != Socket::Status::Done ||
-//        s.set_blocking(true) != Socket::Status::Done) {
-//        exit_with_error("Failed to initialize socket.");
-//    }
-//    /*if (s.init(gs_address.get()->ip_version) != Socket::Status::Done ||
-//            s.bind(gs_address) != Socket::Status::Done ||
-//            s.set_blocking(true) != Socket::Status::Done) {
-//        exit_with_error("Failed to initialize socket.");
-//    }*/
-//
-//
-//    auto status_to_string = [](Socket::Status status) {
-//        switch (status) {
-//            case Socket::Status::Done: return "Done";
-//            case Socket::Status::Error: return "Error";
-//            case Socket::Status::Partial: return "Partial";
-//            case Socket::Status::Disconnected: return "Disconnected";
-//            case Socket::Status::NotReady: return "NotReady";
-//            default: return "Unknown";
-//        }
-//    };
-//
-//
-//    std::string buf;
-//    HostAddress src_addr;
-//    Socket::Status status;
-//    while (true) {
-//        std::cout << "Sending: Hello\n";
-//        status = s.send("Hello\n", gs_address);
-//        if (status != Socket::Status::Done) {
-//            std::cout << "status: " << status_to_string(status) << "\n";
-//            std::cout << "errno: " << strerror(errno) << "\n";
-//            exit(1);
-//        }
-//        std::cout << "Receiving: ";
-//        status = s.receive(buf, src_addr);
-//        if (status != Socket::Status::Done) {
-//            std::cout << "status: " << status_to_string(status) << "\n";
-//            std::cout << "errno: " << strerror(errno) << "\n";
-//            exit(1);
-//        }
-//        std::cout << buf;
-//        break;
-//    }
-//}
+template<typename T, typename U, typename V>
+static bool handle_socket_io(T op, U &&sock_name, V &&action, int tries_cnt) {
+    int attempts_done = 0;
+    while (attempts_done++ < tries_cnt) {
+        auto status = op();
+        switch (status) {
+            case Socket::Status::Done:
+                return true;
+                break;
 
-//#include <cerrno>
-//#include <cstring>
-//void Client::run() noexcept {
-//    TcpSocket s;
-//    if (s.connect(gs_address) != Socket::Status::Done ||
-//        s.set_blocking(true) != Socket::Status::Done) {
-//        exit_with_error("Failed to initialize socket.");
-//    }
-//    /*if (s.init(gs_address.get()->ip_version) != Socket::Status::Done ||
-//            s.bind(gs_address) != Socket::Status::Done ||
-//            s.set_blocking(true) != Socket::Status::Done) {
-//        exit_with_error("Failed to initialize socket.");
-//    }*/
-//
-//
-//    auto status_to_string = [](Socket::Status status) {
-//        switch (status) {
-//            case Socket::Status::Done: return "Done";
-//            case Socket::Status::Error: return "Error";
-//            case Socket::Status::Partial: return "Partial";
-//            case Socket::Status::Disconnected: return "Disconnected";
-//            case Socket::Status::NotReady: return "NotReady";
-//            default: return "Unknown";
-//        }
-//    };
-//
-//
-//    std::string buf;
-//    std::size_t sent = 0;
-//    Socket::Status status;
-//    while (true) {
-//        std::cout << "Sending: Hello\n";
-//        //buf = "Hello!\n";
-//        //status = s.send(buf, sent);
-//        status = s.send_line("line!");
-//        if (status != Socket::Status::Done) {
-//            std::cout << "status: " << status_to_string(status) << "\n";
-//            std::cout << "errno: " << strerror(errno) << "\n";
-//            exit(1);
-//        }
-//        std::cout << "Receiving: ";
-//        //status = s.receive(buf, 10);
-//        status = s.receive_line(buf);
-//        if (status != Socket::Status::Done) {
-//            std::cout << "status: " << status_to_string(status) << "\n";
-//            std::cout << "errno: " << strerror(errno) << "\n";
-//            exit(1);
-//        }
-//        std::cout << buf;
-//        break;
-//    }
-//}
+            case Socket::Status::NotReady:
+                return false;
+                break;
+
+            case Socket::Status::Error: {
+                std::ostringstream str;
+                str << std::forward<U&&>(sock_name) << " socket error occurred while "
+                    << std::forward<V&&>(action) << " data.";
+                exit_with_error(str.str());
+                break;
+            }
+
+            case Socket::Status::Disconnected: {
+                std::ostringstream str;
+                str << std::forward<U&&>(sock_name) << " socket disconnected.";
+                exit_with_error(str.str());
+                break;
+            }
+
+            case Socket::Status::Partial:
+            default:
+                exit_with_error("Socket I/O operation returned invalid status.");
+                break;
+        }
+    }
+
+    return false;
+}

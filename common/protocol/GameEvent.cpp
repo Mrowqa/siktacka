@@ -35,7 +35,7 @@ bool GameEvent::deserialize(GameEvent::Format fmt, const std::string &data) noex
         return false;
     }
 
-    const uint32_t len = *reinterpret_cast<const uint32_t*>(&data[0]);
+    const uint32_t len = be32toh(*reinterpret_cast<const uint32_t*>(&data[0]));
     if (data.size() != len + sizeof(uint32_t) * 2) {  // len + event_* + crc32
         return false;
     }

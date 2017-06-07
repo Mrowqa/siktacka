@@ -21,6 +21,7 @@ HEADERS = common/network/HostAddress.hpp \
 
 COMMON_OBJS = common/network/HostAddress.o \
     common/utils.o \
+    common/RandomNumberGenerator.o \
     common/network/Socket.o \
     common/network/UdpSocket.o \
     common/network/TcpSocket.o \
@@ -30,6 +31,7 @@ COMMON_OBJS = common/network/HostAddress.o \
     common/protocol/utils.o
 
 SERVER_OBJS = server/main.o \
+    server/Server.o \
     $(COMMON_OBJS)
 
 CLIENT_OBJS = client/main.o \

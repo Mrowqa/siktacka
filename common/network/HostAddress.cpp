@@ -8,6 +8,10 @@
 #include <cstring>
 
 
+const uint16_t HostAddress::min_port = 0;
+const uint16_t HostAddress::max_port = 65535;
+
+
 HostAddress::HostAddress(const std::string &host, unsigned short port) {
     resolve(host, port);
 }

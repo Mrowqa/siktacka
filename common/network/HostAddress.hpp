@@ -33,6 +33,9 @@ public:
         void clear() noexcept;
     };
 
+    static const uint16_t min_port;
+    static const uint16_t max_port;
+
 private:
     std::unique_ptr<SocketAddress> addr_ptr;
 

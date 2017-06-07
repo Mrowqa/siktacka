@@ -14,9 +14,6 @@ static constexpr auto server_default_port = 12345;
 static constexpr auto gui_default_hostname = "localhost";
 static constexpr auto gui_default_port = 12346;
 
-static constexpr long long min_port = 0;
-static constexpr long long max_port = 65535;
-
 static constexpr auto heartbeat_interval = 20ms;
 static constexpr auto game_server_timeout = 1min;
 
@@ -431,15 +428,11 @@ std::pair<std::string, unsigned short> with_default_port(std::string address, un
     // If custom port:
     if (divider_pos < address.length() - 1) {
         try {
-            auto port_num = from_string<long long>(address.substr(divider_pos + 1));
-            if (port_num < min_port || max_port < port_num) {
-                exit_with_error("Invalid port number.");
-            }
-
-            port = static_cast<unsigned short>(port_num);
+            port = to_number<uint16_t>("port", address.substr(divider_pos + 1),
+                                       HostAddress::min_port, HostAddress::max_port);
         }
         catch (std::exception &exc) {
-            exit_with_error("Invalid port number.");
+            exit_with_error(exc.what());
         }
     }
 

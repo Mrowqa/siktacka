@@ -245,6 +245,11 @@ void Client::receive_events_from_server() {
             continue;
         }
 
+        if (buffer.size() > max_datagram_size) {
+            std::cout << "Info: Got datagram larger than 512B." << std::endl;
+            continue;
+        }
+
         MultipleGameEvent new_events;
         if (!new_events.deserialize(buffer)) {
             std::cout << "Info: Received malformed data from server." << std::endl;

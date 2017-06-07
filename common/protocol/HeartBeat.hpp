@@ -14,7 +14,8 @@ struct HeartBeat final {
 
     // Prepares proper binary packet. Must be called on valid struct.
     std::string serialize() const noexcept;
-    // Loads binary packet and returns true if action succeeded.
+    // Loads binary packet updating struct fields
+    // and returns true if action succeeded.
     // When error occurred, struct fields can be invalidated.
     bool deserialize(const std::string &data) noexcept;
     // Check if fields contain valid values.

@@ -20,6 +20,12 @@ public:
         Text,
     };
 
+    enum class DeserializationResult {
+        Success,
+        UnknownEventType,
+        Error,
+    };
+
     struct NewGameData final {
         uint32_t maxx = 0;
         uint32_t maxy = 0;
@@ -73,9 +79,9 @@ public:
 
     // Prepares proper packet. Must be called on valid struct.
     std::string serialize(Format fmt) const noexcept;
-    // Loads packet and returns true if action succeeded.
+    // Loads packet and updates class fields.
     // When error occurred, struct fields can be invalidated.
-    bool deserialize(Format fmt, const std::string &data) noexcept;
+    DeserializationResult deserialize(Format fmt, const std::string &data) noexcept;
     // Check if fields contain valid values.
     bool validate(Format fmt) const noexcept;
 

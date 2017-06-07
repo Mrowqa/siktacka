@@ -20,7 +20,8 @@ public:
     // Prepares proper number of proper binary packets.
     // Must be called on valid struct.
     SerializedContainer serialize() const noexcept;
-    // Loads single binary packet and returns true if action succeeded.
+    // Loads single binary packet updating class fields and returns true
+    // if at least one GameEvent was successfully deserialized.
     // When error occurred, struct fields can be invalidated.
     bool deserialize(const std::string &data) noexcept;
     // Check if fields contain valid values.

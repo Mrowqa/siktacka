@@ -27,18 +27,19 @@ std::string GameEvent::serialize(GameEvent::Format fmt) const noexcept {
 }
 
 
-bool GameEvent::deserialize(GameEvent::Format fmt, const std::string &data) noexcept {
+GameEvent::DeserializationResult GameEvent::deserialize(GameEvent::Format fmt,
+                                                        const std::string &data) noexcept {
     if (fmt != GameEvent::Format::Binary) {
         exit_with_error("GameEvent: deserialize does not support Format::Text");
     }
 
     if (data.size() < min_size_of_binary_packet || max_datagram_size < data.size()) {
-        return false;
+        return DeserializationResult::Error;
     }
 
     const uint32_t len = be32toh(*reinterpret_cast<const uint32_t*>(&data[0]));
     if (data.size() != len + sizeof(uint32_t) * 2) {  // len + event_* + crc32
-        return false;
+        return DeserializationResult::Error;
     }
 
     const std::size_t event_offset = 4;
@@ -47,7 +48,7 @@ bool GameEvent::deserialize(GameEvent::Format fmt, const std::string &data) noex
     const uint32_t crc32_recvd = be32toh(*reinterpret_cast<const uint32_t*>(
                                          &data[event_offset + len]));
     if (crc32_value != crc32_recvd) {
-        return false;
+        return DeserializationResult::Error;
     }
 
     event_no = be32toh(*reinterpret_cast<const uint32_t*>(&data[event_offset]));
@@ -76,11 +77,12 @@ bool GameEvent::deserialize(GameEvent::Format fmt, const std::string &data) noex
             break;
 
         default:
-            success = false;
+            return DeserializationResult::UnknownEventType;
             break;
     }
 
-    return success && validate(Format::Binary);
+    return success && validate(Format::Binary)
+           ? DeserializationResult::Success : DeserializationResult::Error;
 }
 
 

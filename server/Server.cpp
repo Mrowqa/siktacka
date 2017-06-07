@@ -2,10 +2,16 @@
 #include <common/utils.hpp>
 
 #include <cstring>
+#include <thread>
+
+using namespace std::chrono_literals;
 
 
 static constexpr auto max_rounds_per_second = 1'000;
 static constexpr auto max_map_dimension = 10'000;
+
+
+static constexpr auto client_timeout = 2s;
 
 
 Server::Server(int argc, char *argv[]) {
@@ -79,6 +85,18 @@ void Server::print_usage(const char *name) const noexcept {
 
 void Server::run() {
     init_server();
+
+    while (true) {
+        handle_clients_input();
+        send_events_to_clients(); // todo note: send packet after packet to all, not to starve anyone
+        if (game_update_pending()) {
+            update_game_state();
+        }
+
+        if (!pending_work()) {
+            std::this_thread::sleep_for(0s);  // quit current time quantum if no more work
+        }
+    }
 }
 
 
@@ -102,4 +120,31 @@ void Server::init_server() {
     }
 
     game_state.map.resize(config.map_height * config.map_width);
+}
+
+
+void Server::handle_clients_input() {
+    // todo
+}
+
+
+void Server::send_events_to_clients() {
+    // todo
+}
+
+
+void Server::update_game_state() {
+    // todo
+}
+
+
+bool Server::game_update_pending() const {
+    // todo
+    return false;
+}
+
+
+bool Server::pending_work() const {
+    // todo
+    return false;
 }

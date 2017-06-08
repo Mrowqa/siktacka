@@ -3,6 +3,7 @@
 #include <common/protocol/MultipleGameEvent.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <thread>
 
@@ -11,9 +12,12 @@ using namespace std::chrono_literals;
 
 // TODO adjust two constants below
 static constexpr auto max_rounds_per_second = 1'000;
+static constexpr auto max_turning_speed = 359;
 static constexpr auto max_map_dimension = 10'000;
 
+static constexpr auto deg_to_rad = M_PI / 180.;
 static constexpr auto max_connected_clients = 42;
+static constexpr auto min_players_number = 2;
 static constexpr auto client_timeout = 2s;
 
 template<typename T, typename It>
@@ -67,7 +71,7 @@ void Server::parse_arguments(int argc, char *argv[]) {
 
                 case 't':
                     config.turning_speed = to_number<decltype(config.turning_speed)>(
-                            "-t", argv[i + 1], 1);
+                            "-t", argv[i + 1], 1, max_turning_speed);
                     break;
 
                 case 'r':
@@ -275,11 +279,12 @@ void Server::send_events_to_clients() {
     for (std::size_t i = 0; i < clients_num; i++) {
         auto &client = server_state.next_client->second;
         if (client.last_heartbeat_time + client_timeout < now) {
-            disconnect_client(server_state.next_client);
+            server_state.next_client = disconnect_client(server_state.next_client);
             continue;
         }
 
-        if (client.next_event_no == game_state.serialized_events.size()) {
+        if (!client.watching_game
+                || client.next_event_no == game_state.serialized_events.size()) {
             server_state.next_client = advance_iterator_circularly(
                     server_state.clients, server_state.next_client);
             continue;
@@ -306,7 +311,168 @@ void Server::send_events_to_clients() {
 void Server::update_game_state() {
     game_state.next_update_time += 1'000'000us / config.rounds_per_second;
 
+    if (game_state.game_in_progress) {
+        update_lasting_game_state();
+    }
+    else {
+        start_new_game_if_possible();
+    }
+}
 
+
+void Server::update_lasting_game_state() {
+    for (std::size_t ind = 0; ind < game_state.players.size(); ind++) {
+        auto &player = game_state.players[ind];
+        if (!player.alive) {
+            continue;
+        }
+
+        uint32_t last_x = player.pos_x;
+        uint32_t last_y = player.pos_y;
+
+        if (player.turn_direction == -1) {
+            player.angle -= config.turning_speed;
+            if (player.angle < 0) {
+                player.angle += 360;
+            }
+        }
+        else if (player.turn_direction == 1) {
+            player.angle += config.turning_speed;
+            if (player.angle >= 360) {
+                player.angle -= 360;
+            }
+        }
+
+        // TODO validate that...
+        player.pos_x += cos(player.angle * deg_to_rad);
+        player.pos_y += sin(player.angle * deg_to_rad);
+
+        uint32_t new_x = player.pos_x;
+        uint32_t new_y = player.pos_y;
+
+        if (last_x == new_x && last_y == new_y) {
+            continue;
+        }
+
+        if (!is_on_map(player.pos_x, player.pos_y) || map_get(new_x, new_y)) {
+            if (handle_player_eliminated(ind)) {
+                return;  // game over
+            }
+        }
+        else {
+            handle_pixel_event(ind, new_x, new_y);
+        }
+    }
+}
+
+
+void Server::start_new_game_if_possible() {
+    // TODO split into smaller functions
+    uint8_t counter = 0;
+    std::vector<std::string> names;
+
+    // Validate if all clients with non-empty login are ready
+    for (auto &client : server_state.clients) {
+        if (client.second.name.empty()) {
+            continue;
+        }
+
+        if (!client.second.ready_to_play) {
+            return;
+        }
+
+        counter++;
+        names.push_back(client.second.name);
+    }
+
+    if (counter < min_players_number) {
+        return;
+    }
+
+    std::sort(names.begin(), names.end());
+
+    // Crop the player list if they do not fit into one UDP datagram
+    GameEvent ev;
+    ev.type = GameEvent::Type::NewGame;
+    ev.new_game_data.maxx = config.map_width;
+    ev.new_game_data.maxy = config.map_height;
+    ev.new_game_data.players_names = std::move(names);
+
+    auto &pl_names = ev.new_game_data.players_names;
+    auto names_size = ev.new_game_data.calculate_used_names_capacity();
+    while (ev.new_game_data.names_capacity < names_size) {
+        names_size -= pl_names.size() + 1;
+        pl_names.pop_back();
+    }
+
+    // Emit NewGame event and map clients to players
+    game_state.game_id = server_state.rand_gen.next();
+    game_state.serialized_events.clear();
+    game_state.game_in_progress = true;
+    emit_game_event(ev);
+    game_state.players.resize(pl_names.size());
+    game_state.alive_players_cnt = game_state.players.size();
+
+    for (auto &client : server_state.clients) {
+        client.second.watching_game = true;
+        if (client.second.name.empty()) {
+            continue;
+        }
+
+        auto it = std::lower_bound(pl_names.begin(), pl_names.end(),
+                                   client.second.name);
+        if (*it != client.second.name) {
+            continue;  // too many players, this one is not lucky
+        }
+
+        auto ind = it - names.begin();
+        client.second.player_no = ind;
+        game_state.players[ind].name = client.second.name;
+    }
+
+    // Init map
+    game_state.map.resize(0);
+    game_state.map.resize(config.map_height * config.map_width);
+
+    // Init players
+    for (std::size_t ind = 0; ind < game_state.players.size(); ind++) {
+        auto &player = game_state.players[ind];
+
+        player.turn_direction = 0;
+        player.alive = true;
+        player.pos_x = (server_state.rand_gen.next() % config.map_width) + 0.5;
+        player.pos_y = (server_state.rand_gen.next() % config.map_height) + 0.5;
+        player.angle = server_state.rand_gen.next() % 360;
+
+        uint32_t x = player.pos_x;
+        uint32_t y = player.pos_y;
+
+        if (map_get(x, y)) {
+            if (handle_player_eliminated(ind)) {
+                return; // game over
+            }
+        }
+        else {
+            map_set(x, y);
+            handle_pixel_event(ind, x, y);
+        }
+    }
+}
+
+
+bool Server::is_on_map(double x, double y) const {
+    return x <= 0 && x < config.map_width &&
+           y <= 0 && y < config.map_height;
+}
+
+
+void Server::map_set(uint32_t x, uint32_t y) {
+    game_state.map[y * config.map_width + x] = true;
+}
+
+
+bool Server::map_get(uint32_t x, uint32_t y) const {
+    return game_state.map[y * config.map_width + x];
 }
 
 
@@ -332,6 +498,52 @@ bool Server::pending_work() const {
     // TODO check if data awaiting on sockets (should not make real difference)
 
     return false;
+}
+
+
+void Server::handle_pixel_event(uint8_t player_no, uint32_t x, uint32_t y) {
+    GameEvent ev;
+    ev.type = GameEvent::Type::Pixel;
+    ev.pixel_data.player_no = player_no;
+    ev.pixel_data.x = x;
+    ev.pixel_data.y = y;
+
+    emit_game_event(ev);
+}
+
+
+bool Server::handle_player_eliminated(uint8_t player_no) {
+    GameEvent ev;
+    ev.type = GameEvent::Type::PlayerEliminated;
+    ev.player_eliminated_data.player_no = player_no;
+    emit_game_event(ev);
+    std::cout << "Player eliminated: " << game_state.players[player_no].name
+              << std::endl;
+
+    game_state.players[player_no].alive = false;
+    game_state.alive_players_cnt--;
+    if (game_state.alive_players_cnt <= 1) {
+        game_state.game_in_progress = false;
+        ev.type = GameEvent::Type::GameOver;
+        emit_game_event(ev);
+        std::cout << "Game over." << std::endl;
+
+        return true;
+    }
+
+    return false;
+}
+
+
+void Server::emit_game_event(GameEvent &event) {
+    event.event_no = game_state.serialized_events.size();
+    if (!event.validate(GameEvent::Format::Binary)) {
+        std::cout << "Warning: Tried to emit invalid game event. "
+                  << "Dropping it." << std::endl;
+    }
+
+    game_state.serialized_events.emplace_back(
+            event.serialize(GameEvent::Format::Binary));
 }
 
 

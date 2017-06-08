@@ -2,6 +2,7 @@
 
 #include <common/RandomNumberGenerator.hpp>
 #include <common/network/UdpSocket.hpp>
+#include <common/protocol/GameEvent.hpp>
 #include <common/protocol/HeartBeat.hpp>
 
 #include <chrono>
@@ -19,7 +20,7 @@ private:
     // represents player in game
     struct Player {
         std::string name;
-        uint8_t turn_direction;
+        int8_t turn_direction;
         bool alive;
         double pos_x;
         double pos_y;
@@ -32,7 +33,7 @@ private:
         uint64_t session_id;
         std::string name;
 
-        int8_t player_no;  // number of player during game, -1 if observer
+        int8_t player_no;  // number of players during game, -1 if observer
         bool watching_game;
         std::chrono::system_clock::time_point last_heartbeat_time;
         bool ready_to_play;
@@ -57,10 +58,11 @@ public:  using ClientContainer = std::map<HostAddress, ClientSession>;
         using system_clock = std::chrono::system_clock;
 
         std::vector<Player> players;
+        uint8_t alive_players_cnt = 0;
         uint32_t game_id = 0;
         bool game_in_progress = false;
         std::vector<bool> map;
-        std::deque<std::string> serialized_events; // to think about TODO
+        std::deque<std::string> serialized_events;
         system_clock::time_point next_update_time = system_clock::now();
     } game_state;
 
@@ -78,6 +80,8 @@ public:
     void run();
 
 private:
+    // TODO separate game engine and clients management.
+    // Clients management
     void parse_arguments(int argc, char *argv[]);
     void print_usage(const char *name) const noexcept;
     void init_server();
@@ -88,9 +92,20 @@ private:
             const HostAddress &client_addr, const HeartBeat &hb);
     bool check_name_availability(const std::string &name) const noexcept;
     void send_events_to_clients();
-    void update_game_state();
-    bool game_update_pending() const;
     bool pending_work() const;
 
-    // start_new_game ...
+    // Game logic
+    void update_game_state();
+    void update_lasting_game_state();
+    void start_new_game_if_possible();
+    // Modifies event_no field, then serializes and caches
+    // event in game_state.serialized_events
+    void emit_game_event(GameEvent &event);
+    bool is_on_map(double x, double y) const;
+    void map_set(uint32_t x, uint32_t y);
+    bool map_get(uint32_t x, uint32_t y) const;
+    bool game_update_pending() const;
+    void handle_pixel_event(uint8_t player_no, uint32_t x, uint32_t y);
+    // Returns true if game is over.
+    bool handle_player_eliminated(uint8_t player_no);
 };

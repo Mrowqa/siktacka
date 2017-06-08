@@ -17,7 +17,15 @@ HostAddress::HostAddress(const std::string &host, unsigned short port) {
 }
 
 
-void HostAddress::set(const SocketAddress& sock_addr) noexcept {
+HostAddress::HostAddress(const HostAddress &addr) {
+    auto sock_addr = addr.get();
+    if (sock_addr) {
+        set(*sock_addr);
+    }
+}
+
+
+void HostAddress::set(const SocketAddress &sock_addr) noexcept {
     if (addr_ptr == nullptr) {
         addr_ptr = std::make_unique<SocketAddress>();
     }
@@ -107,37 +115,49 @@ std::string HostAddress::to_string() const noexcept {
 
 
 bool HostAddress::operator==(const HostAddress &rhs) const noexcept {
-    if (addr_ptr == nullptr) {
-        return rhs.addr_ptr == nullptr;
-    }
-
-    if (rhs.addr_ptr == nullptr) {
-        return false;
-    }
-
-    if (addr_ptr->ip_version != rhs.addr_ptr->ip_version) {
-        return false;
-    }
-
-    switch (addr_ptr->ip_version) {
-        case IpVersion::IPv4:
-            return 0 == memcmp(&addr_ptr->addr_v4, &rhs.addr_ptr->addr_v4, sizeof(addr_ptr->addr_v4));
-            break;
-
-        case IpVersion::IPv6:
-            return 0 == memcmp(&addr_ptr->addr_v6, &rhs.addr_ptr->addr_v6, sizeof(addr_ptr->addr_v6));
-            break;
-
-        case IpVersion::None:
-        default:
-            return true;
-            break;
-    }
+    return compare(rhs) == 0;
 }
 
 
 bool HostAddress::operator!=(const HostAddress &rhs) const noexcept {
-    return !(*this == rhs);
+    return compare(rhs) != 0;
+}
+
+
+bool HostAddress::operator<(const HostAddress &rhs) const noexcept {
+    return compare(rhs) < 0;
+}
+
+
+int HostAddress::compare(const HostAddress &rhs) const noexcept {
+    if (addr_ptr == nullptr) {
+        return rhs.addr_ptr == nullptr ? 0 : -1;
+    }
+
+    if (rhs.addr_ptr == nullptr) {
+        return 1;
+    }
+
+    if (addr_ptr->ip_version != rhs.addr_ptr->ip_version) {
+        using UndType = std::underlying_type<IpVersion>::type;
+        return static_cast<UndType>(addr_ptr->ip_version) <
+               static_cast<UndType>(rhs.addr_ptr->ip_version) ? -1 : 1;
+    }
+
+    switch (addr_ptr->ip_version) {
+        case IpVersion::IPv4:
+            return memcmp(&addr_ptr->addr_v4, &rhs.addr_ptr->addr_v4, sizeof(addr_ptr->addr_v4));
+            break;
+
+        case IpVersion::IPv6:
+            return memcmp(&addr_ptr->addr_v6, &rhs.addr_ptr->addr_v6, sizeof(addr_ptr->addr_v6));
+            break;
+
+        case IpVersion::None:
+        default:
+            return 0;
+            break;
+    }
 }
 
 

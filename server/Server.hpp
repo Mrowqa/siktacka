@@ -1,11 +1,14 @@
 #pragma once
 
-#include <common/network/UdpSocket.hpp>
 #include <common/RandomNumberGenerator.hpp>
+#include <common/network/UdpSocket.hpp>
+#include <common/protocol/HeartBeat.hpp>
 
-#include <deque>
-#include <vector>
 #include <chrono>
+#include <deque>
+#include <list>
+#include <map>
+#include <vector>
 
 
 class Server {
@@ -30,11 +33,15 @@ private:
         std::string name;
 
         int8_t player_no;  // number of player during game, -1 if observer
-        bool watching_current_game;
+        bool watching_game;
         std::chrono::system_clock::time_point last_heartbeat_time;
         bool ready_to_play;
         uint32_t next_event_no;
     };
+
+    // for fast and balanced iterating through all clients and lookups
+public:  using ClientContainer = std::map<HostAddress, ClientSession>;
+
 
     // server config
     struct {
@@ -45,18 +52,24 @@ private:
         uint16_t port_number = 12345;
     } config;
 
+    // game state
     struct {
+        using system_clock = std::chrono::system_clock;
+
         std::vector<Player> players;
         uint32_t game_id = 0;
         bool game_in_progress = false;
         std::vector<bool> map;
         std::deque<std::string> serialized_events; // to think about TODO
-        std::chrono::system_clock::time_point next_update_time;
+        system_clock::time_point next_update_time = system_clock::now();
     } game_state;
 
+    // server state
     struct {
         RandomNumberGenerator rand_gen;
-        std::deque<ClientSession> clients;
+        ClientContainer clients;
+        ClientContainer::iterator next_client;  // who will get game events updates
+                                                // if waiting for any
     } server_state;
 
 
@@ -68,7 +81,12 @@ private:
     void parse_arguments(int argc, char *argv[]);
     void print_usage(const char *name) const noexcept;
     void init_server();
+    void check_clients_connections();
+    ClientContainer::iterator disconnect_client(ClientContainer::iterator client);
     void handle_clients_input();
+    ClientContainer::iterator handle_client_session(
+            const HostAddress &client_addr, const HeartBeat &hb);
+    bool check_name_availability(const std::string &name) const noexcept;
     void send_events_to_clients();
     void update_game_state();
     bool game_update_pending() const;

@@ -7,8 +7,8 @@
 
 // TODO idea (I invented it after implementing current idea)
 // Write buffer class with templates operator << and >>
-// which loads/dumps numbers with endian conversions
-// and also handles strings.
+// which loads/dumps numbers of different sizes with endian
+// conversions and also handles strings.
 // Then serialization and deserialization would be so easy
 // as using std::cout and std::cin.
 

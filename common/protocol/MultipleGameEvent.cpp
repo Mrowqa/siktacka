@@ -6,33 +6,19 @@
 #include <endian.h>
 
 
-MultipleGameEvent::SerializedContainer MultipleGameEvent::serialize() const noexcept {
-    assert(validate());
-
-    SerializedContainer result;
+std::pair<std::string, uint32_t> MultipleGameEvent::prepare_packet_from_cache(
+        const std::deque<std::string> &cache, uint32_t next_no) const noexcept {
     std::string buffer;
+    buffer.reserve(max_datagram_size);
+    buffer.resize(sizeof(uint32_t));
+    *reinterpret_cast<uint32_t*>(&buffer[0]) = htobe32(game_id);
 
-    auto add_header = [](std::string &buffer, uint32_t game_id) {
-        buffer.resize(sizeof(uint32_t));
-        *reinterpret_cast<uint32_t*>(&buffer[0]) = htobe32(game_id);
-    };
-
-    add_header(buffer, game_id);
-    for (const auto &ev : events) {
-        std::string serialized_ev = ev->serialize(GameEvent::Format::Binary);
-        if (buffer.size() + serialized_ev.size() > max_datagram_size) {
-            result.emplace_back(std::move(buffer));
-            add_header(buffer, game_id);
-        }
-
-        buffer += serialized_ev; // size is proper (we assume user has called validate())
+    for (; next_no < cache.size()
+           && buffer.size() + cache[next_no].size() <= max_datagram_size; next_no++) {
+        buffer += cache[next_no];
     }
 
-    if (buffer.size() > sizeof(uint32_t)) {
-        result.emplace_back(std::move(buffer));
-    }
-
-    return result;
+    return std::make_pair(buffer, next_no);
 }
 
 

@@ -40,9 +40,10 @@ private:
     std::unique_ptr<SocketAddress> addr_ptr;
 
 public:
-
     HostAddress() noexcept = default;
     HostAddress(const std::string &host, unsigned short port);
+    HostAddress(HostAddress &&addr) = default;
+    HostAddress(const HostAddress &addr);
 
     // sets new socket address
     void set(const SocketAddress &sock_addr) noexcept;
@@ -57,4 +58,8 @@ public:
 
     bool operator==(const HostAddress &rhs) const noexcept;
     bool operator!=(const HostAddress &rhs) const noexcept;
+    bool operator< (const HostAddress &rhs) const noexcept;
+
+private:
+    int compare(const HostAddress &rhs) const noexcept;
 };

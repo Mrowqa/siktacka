@@ -381,6 +381,7 @@ std::string Client::validate_game_event(const GameEvent &event) {
     }
 
     if (game_state.game_over) {
+        std::cout << "Game type: " << (int)(event.type) << std::endl;  // TODO tmp print; delete it
         return "Server error: got event after game over.";
     }
 

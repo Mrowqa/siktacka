@@ -78,7 +78,7 @@ void Client::run() {
         receive_events_from_server();  // at last, we want to receive new events
 
         if (!pending_work()) {
-            std::this_thread::sleep_for(0s);  // quit current time quantum if no more work
+            std::this_thread::sleep_for(1ms);  // sleep a little bit if no more work
         }
     }
 }
@@ -234,7 +234,7 @@ void Client::receive_events_from_server() {
             if (client_state.last_server_response + game_server_timeout < now) {
                 exit_with_error("Game server time out.");
             }
-            continue;
+            break;
         }
 
         if (src_addr != gs_address) {

@@ -104,8 +104,7 @@ void Server::run() {
             send_events_to_clients();
 
             if (!pending_work()) {
-                std::this_thread::sleep_for(0s);  // quit current time quantum if no more work
-                // todo czemu 100% procka?
+                std::this_thread::sleep_for(1ms);  // sleep a little bit if no more work
             }
         } while (!game_update_pending());
 

@@ -1,6 +1,6 @@
 TARGET = siktacka-server siktacka-client
 EXT_LIBS = -lz
-CC = clang++
+CC = g++
 CFLAGS = -Wall -Wextra -Wpedantic --std=c++14 -O3 -I.
 LFLAGS = -Wall -Wextra $(EXT_LIBS)
 

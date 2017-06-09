@@ -1,21 +1,9 @@
 #pragma once
 
-
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
 #include <limits>
-
-
-// TODO is that deadcode?
-class unimplemented_error : public std::exception {
-public:
-    unimplemented_error(const std::string &message);
-    virtual const char* what() const noexcept;
-
-private:
-    const std::string message;
-};
 
 
 template<typename T, typename U, typename V>

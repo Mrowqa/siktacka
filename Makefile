@@ -5,8 +5,6 @@ CFLAGS = -Wall -Wextra -Wpedantic --std=c++14 -O3 -I.
 LFLAGS = -Wall -Wextra $(EXT_LIBS)
 
 
-# TODO normal (release) mode - without asserts
-
 HEADERS = common/network/HostAddress.hpp \
     common/utils.hpp \
     common/utils_impl.hpp \
@@ -20,7 +18,6 @@ HEADERS = common/network/HostAddress.hpp \
     client/Client.hpp
 
 COMMON_OBJS = common/network/HostAddress.o \
-    common/utils.o \
     common/RandomNumberGenerator.o \
     common/network/Socket.o \
     common/network/UdpSocket.o \

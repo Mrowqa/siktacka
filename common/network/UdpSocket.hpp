@@ -9,6 +9,7 @@ extern const std::size_t max_datagram_size;
 class UdpSocket final : public Socket {
 private:
     HostAddress::SocketAddress preallocated_sock_addr;  // for optimization matters in receive
+                                                        // (profiled with gprof)
 
 public:
     UdpSocket() noexcept = default;

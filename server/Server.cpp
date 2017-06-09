@@ -11,10 +11,10 @@
 using namespace std::chrono_literals;
 
 
-// TODO adjust two constants below
+// TODO adjust first two constants below
 static constexpr auto max_rounds_per_second = 1'000;
-static constexpr auto max_turning_speed = 359;
 static constexpr auto max_map_dimension = 10'000;
+static constexpr auto max_turning_speed = 359;
 
 static constexpr auto deg_to_rad = M_PI / 180.;
 static constexpr auto max_connected_clients = 42;
@@ -95,11 +95,30 @@ void Server::print_usage(const char *name) const noexcept {
 
 
 void Server::run() {
+    // Loop design:
+    //
+    //    * handle_clients_input() and send_events_to_clients() does at most one network
+    //      I/O, so work is balanced between receiving input (+ client session management)
+    //      and sending events to clients.
+    //
+    //    * send_events_to_clients() sends only one datagram to client and iterates
+    //      to a next one. This way, in case of long game and a new client joining
+    //      the server, this client does not have higher priority. In fact, all clients
+    //      have the same priority.
+    //
+    //    * if there is no work to do (i.a. datagrams to be send and pending game update),
+    //      the server sleeps for a while to avoid burning CPU cycles uselessly.
+    //
+    // Note: in case for UPDATES_PER_SECOND = 1 and tests for exactly 2s timeout, clients
+    //       timeouts are being checked in check_clients_connections() and before sending
+    //       datagram in send_events_to_clients(). In fact, one of these methods would be
+    //       enough, preferably the lazy one (in send_events_to_clients()).
+
     init_server();
 
     while (true) {
-        check_clients_connections(); // delete TODO
-        do { // todo napisać uzasadnienie tego designu
+        check_clients_connections();
+        do {
             handle_clients_input();
             send_events_to_clients();
 
@@ -138,7 +157,6 @@ void Server::init_server() {
 
 
 void Server::check_clients_connections() {
-    // todo powiedz czemu ta redundancja..
     auto it = server_state.clients.begin();
     auto now = std::chrono::system_clock::now();
 

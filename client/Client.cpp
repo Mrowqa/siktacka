@@ -42,6 +42,12 @@ void Client::parse_arguments(int argc, char **argv) noexcept {
     if (!validate_player_name(player_name)) {
         exit_with_error("Invalid player name");
     }
+    if (player_name.empty()) {
+        std::cout << "Joining as observer." << std::endl;
+    }
+    else {
+        std::cout << "Joining as player \"" << player_name << "\"." << std::endl;
+    }
 
     auto address = with_default_port(argv[2], server_default_port);
     if (!gs_address.resolve(address.first, address.second)) {

@@ -11,7 +11,6 @@
 using namespace std::chrono_literals;
 
 
-// TODO adjust first two constants below
 static constexpr auto max_rounds_per_second = 1'000;
 static constexpr auto max_map_dimension = 10'000;
 static constexpr auto max_turning_speed = 359;
@@ -22,7 +21,8 @@ static constexpr auto min_players_number = 2;
 static constexpr auto client_timeout = 2s;
 
 template<typename T, typename It>
-static It advance_iterator_circularly(T &container, It it) ;
+static It advance_iterator_circularly(T &container, It it);
+static std::string log_name(const std::string &name, bool capitalized);
 
 
 Server::Server(int argc, char *argv[]) {
@@ -173,7 +173,7 @@ void Server::check_clients_connections() {
 
 
 void Server::disconnect_client(Server::ClientContainer::iterator client) {
-    std::cout << "Player disconnected: " << client->second.name << "." << std::endl;
+    std::cout << log_name(client->second.name, true) << " disconnected." << std::endl;
 
     bool replace_next = server_state.next_client == client;
     client = server_state.clients.erase(client);
@@ -213,8 +213,9 @@ void Server::handle_clients_input() {
 
     auto &client = client_it->second;
 
-    if (!client.ready_to_play && !game_state.game_in_progress && hb.turn_direction != 0) {
-        std::cout << "Client " << client.name << " is ready." << std::endl;
+    if (!client.ready_to_play && !game_state.game_in_progress
+            && hb.turn_direction != 0 && !client.name.empty()) {
+        std::cout << log_name(client.name, true) << " is ready." << std::endl;
         client.ready_to_play = true;
     }
 
@@ -233,19 +234,19 @@ Server::ClientContainer::iterator Server::handle_client_session(
         // new client
         if (server_state.clients.size() >= max_connected_clients) {
             // TODO log not too often
-            std::cout << "Rejecting player " << hb.player_name
+            std::cout << "Rejecting " << log_name(hb.player_name, false)
                       << ": maximum number of clients reached." << std::endl;
             return server_state.clients.end();
         }
 
         if (!check_name_availability(hb.player_name)) {
             // TODO log not too often
-            std::cout << "Rejecting player " << hb.player_name
+            std::cout << "Rejecting " << log_name(hb.player_name, false)
                       << ": name already in use." << std::endl;
             return server_state.clients.end();
         }
 
-        std::cout << "New player connected: " << hb.player_name << "." << std::endl;
+        std::cout << log_name(hb.player_name, true) << " connected." << std::endl;
         new_session = true;
 
         auto &client = server_state.clients[client_addr];
@@ -261,8 +262,8 @@ Server::ClientContainer::iterator Server::handle_client_session(
                 return server_state.clients.end();
             }
 
-            std::cout << "Player " << client.name << " initialized new session as "
-                      << hb.player_name << "." << std::endl;
+            std::cout << log_name(client.name, true) << " initialized new session as "
+                      << log_name(hb.player_name, false) << "." << std::endl;
             new_session = true;
         }
         else if (client.name != hb.player_name) {
@@ -289,8 +290,8 @@ Server::ClientContainer::iterator Server::handle_client_session(
 
 
 bool Server::check_name_availability(const std::string &name) const noexcept {
-    return std::all_of(server_state.clients.begin(), server_state.clients.end(),
-                       [&name](const auto &client_session) {
+    return name.empty() || std::all_of(server_state.clients.begin(), server_state.clients.end(),
+            [&name](const auto &client_session) {
         return name != client_session.second.name;
     });
 }
@@ -556,8 +557,7 @@ bool Server::handle_player_eliminated_event(uint8_t player_no) {
     ev.type = GameEvent::Type::PlayerEliminated;
     ev.player_eliminated_data.player_no = player_no;
     emit_game_event(ev);
-    std::cout << "Player eliminated: " << game_state.players[player_no].name
-              << std::endl;
+    std::cout << log_name(game_state.players[player_no].name, true) << " is eliminated." << std::endl;
 
     game_state.players[player_no].alive = false;
     game_state.alive_players_cnt--;
@@ -595,4 +595,14 @@ static It advance_iterator_circularly(T &container, It it) {
     }
 
     return it;
+}
+
+
+static std::string log_name(const std::string &name, bool capitalized) {
+    std::string result = name.empty() ? "observer" : "player \"" + name + "\"";
+    if (capitalized) {
+        result[0] += 'A' - 'a';
+    }
+
+    return result;
 }

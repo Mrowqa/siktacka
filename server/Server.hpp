@@ -35,6 +35,7 @@ private:
 
         int8_t player_no;  // number of players during game, -1 if observer
         bool watching_game;
+        bool got_new_game_event;
         std::chrono::system_clock::time_point last_heartbeat_time;
         bool ready_to_play;
         uint32_t next_event_no;
@@ -86,7 +87,8 @@ private:
     void print_usage(const char *name) const noexcept;
     void init_server();
     void check_clients_connections();
-    ClientContainer::iterator disconnect_client(ClientContainer::iterator client);
+    // Takes care of server_state.next_client
+    void disconnect_client(ClientContainer::iterator client);
     void handle_clients_input();
     ClientContainer::iterator handle_client_session(
             const HostAddress &client_addr, const HeartBeat &hb);
@@ -107,5 +109,5 @@ private:
     bool game_update_pending() const;
     void handle_pixel_event(uint8_t player_no, uint32_t x, uint32_t y);
     // Returns true if game is over.
-    bool handle_player_eliminated(uint8_t player_no);
+    bool handle_player_eliminated_event(uint8_t player_no);
 };

@@ -3,6 +3,7 @@
 #include <common/protocol/MultipleGameEvent.hpp>
 
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <cstring>
 #include <thread>
@@ -104,6 +105,7 @@ void Server::run() {
 
             if (!pending_work()) {
                 std::this_thread::sleep_for(0s);  // quit current time quantum if no more work
+                // todo czemu 100% procka?
             }
         } while (!game_update_pending());
 
@@ -117,7 +119,7 @@ void Server::init_server() {
               << "         Dimensions: " << config.map_width << " x " << config.map_height << std::endl
               << "  Rounds per second: " << config.rounds_per_second << std::endl
               << "      Turning speed: " << config.turning_speed << std::endl
-              << " ---->  Server port: " << config.port_number << "  <----" << std::endl
+              << "        Server port: " << config.port_number << std::endl
               << "        Random seed: " << server_state.rand_gen.peek() << std::endl
               << "------------------------------------------------" << std::endl
               << std::endl;
@@ -137,31 +139,31 @@ void Server::init_server() {
 
 
 void Server::check_clients_connections() {
+    // todo powiedz czemu ta redundancja..
     auto it = server_state.clients.begin();
     auto now = std::chrono::system_clock::now();
 
     while (it != server_state.clients.end()) {
+        auto next = it;
+        next++;
         if (it->second.last_heartbeat_time + client_timeout < now) {
-            it = disconnect_client(it);
+            disconnect_client(it);
         }
-        else {
-            it++;
-        }
+
+        it = next;
     }
 }
 
 
-Server::ClientContainer::iterator Server::disconnect_client(
-        Server::ClientContainer::iterator client) {
+void Server::disconnect_client(Server::ClientContainer::iterator client) {
     std::cout << "Player disconnected: " << client->second.name << "." << std::endl;
 
     bool replace_next = server_state.next_client == client;
     client = server_state.clients.erase(client);
     if (replace_next) {
-        server_state.next_client = client;
+        server_state.next_client = client == server_state.clients.end()
+                                   ? client = server_state.clients.begin() : client;
     }
-
-    return client;
 }
 
 
@@ -188,6 +190,10 @@ void Server::handle_clients_input() {
         return;
     }
 
+    if (server_state.clients.size() == 1) {
+        server_state.next_client = server_state.clients.begin();
+    }
+
     auto &client = client_it->second;
 
     if (!client.ready_to_play && !game_state.game_in_progress && hb.turn_direction != 0) {
@@ -205,7 +211,9 @@ Server::ClientContainer::iterator Server::handle_client_session(
         const HostAddress &client_addr, const HeartBeat &hb) {
     bool new_session = false;
     auto client_it = server_state.clients.find(client_addr);
+
     if (client_it == server_state.clients.end()) {
+        // new client
         if (server_state.clients.size() >= max_connected_clients) {
             // TODO log not too often
             std::cout << "Rejecting player " << hb.player_name
@@ -228,6 +236,7 @@ Server::ClientContainer::iterator Server::handle_client_session(
         client_it = server_state.clients.find(client_addr);
     }
     else {
+        // known client
         auto &client = client_it->second;
         if (client.session_id != hb.session_id) {
             if (client.name != hb.player_name && !check_name_availability(hb.player_name)) {
@@ -251,6 +260,8 @@ Server::ClientContainer::iterator Server::handle_client_session(
         client.player_no = -1;
         client.watching_game = game_state.game_in_progress;
         client.ready_to_play = false;
+        // New clients should ask for event no 0.
+        client.got_new_game_event = true;
     }
 
     client.last_heartbeat_time = std::chrono::system_clock::now();
@@ -277,14 +288,19 @@ void Server::send_events_to_clients() {
     auto now = std::chrono::system_clock::now();
 
     for (std::size_t i = 0; i < clients_num; i++) {
+        assert(server_state.next_client != server_state.clients.end());
         auto &client = server_state.next_client->second;
         if (client.last_heartbeat_time + client_timeout < now) {
-            server_state.next_client = disconnect_client(server_state.next_client);
+            disconnect_client(server_state.next_client); // advances circularly next_client
             continue;
         }
 
+        if (client.watching_game && !client.got_new_game_event) {
+            client.next_event_no = 0;
+        }
+
         if (!client.watching_game
-                || client.next_event_no == game_state.serialized_events.size()) {
+                || client.next_event_no >= game_state.serialized_events.size()) {
             server_state.next_client = advance_iterator_circularly(
                     server_state.clients, server_state.next_client);
             continue;
@@ -297,6 +313,9 @@ void Server::send_events_to_clients() {
 
         if (socket.send(data_and_offset.first,
                         server_state.next_client->first) == Socket::Status::Done) {
+            if (client.next_event_no == 0) {
+                client.got_new_game_event = true;
+            }
             client.next_event_no = data_and_offset.second;
         }
         // we are intentionally ignoring errors here
@@ -343,7 +362,6 @@ void Server::update_lasting_game_state() {
             }
         }
 
-        // TODO validate that...
         player.pos_x += cos(player.angle * deg_to_rad);
         player.pos_y += sin(player.angle * deg_to_rad);
 
@@ -355,7 +373,7 @@ void Server::update_lasting_game_state() {
         }
 
         if (!is_on_map(player.pos_x, player.pos_y) || map_get(new_x, new_y)) {
-            if (handle_player_eliminated(ind)) {
+            if (handle_player_eliminated_event(ind)) {
                 return;  // game over
             }
         }
@@ -389,6 +407,8 @@ void Server::start_new_game_if_possible() {
         return;
     }
 
+    std::cout << "Starting new game." << std::endl;
+
     std::sort(names.begin(), names.end());
 
     // Crop the player list if they do not fit into one UDP datagram
@@ -415,6 +435,8 @@ void Server::start_new_game_if_possible() {
 
     for (auto &client : server_state.clients) {
         client.second.watching_game = true;
+        client.second.got_new_game_event = false;
+        client.second.ready_to_play = false;
         if (client.second.name.empty()) {
             continue;
         }
@@ -425,14 +447,14 @@ void Server::start_new_game_if_possible() {
             continue;  // too many players, this one is not lucky
         }
 
-        auto ind = it - names.begin();
+        auto ind = it - pl_names.begin();
         client.second.player_no = ind;
         game_state.players[ind].name = client.second.name;
     }
 
     // Init map
     game_state.map.resize(0);
-    game_state.map.resize(config.map_height * config.map_width);
+    game_state.map.resize(config.map_height * config.map_width, false);
 
     // Init players
     for (std::size_t ind = 0; ind < game_state.players.size(); ind++) {
@@ -448,12 +470,11 @@ void Server::start_new_game_if_possible() {
         uint32_t y = player.pos_y;
 
         if (map_get(x, y)) {
-            if (handle_player_eliminated(ind)) {
+            if (handle_player_eliminated_event(ind)) {
                 return; // game over
             }
         }
         else {
-            map_set(x, y);
             handle_pixel_event(ind, x, y);
         }
     }
@@ -461,8 +482,8 @@ void Server::start_new_game_if_possible() {
 
 
 bool Server::is_on_map(double x, double y) const {
-    return x <= 0 && x < config.map_width &&
-           y <= 0 && y < config.map_height;
+    return 0 <= x && x < config.map_width &&
+           0 <= y && y < config.map_height;
 }
 
 
@@ -507,12 +528,13 @@ void Server::handle_pixel_event(uint8_t player_no, uint32_t x, uint32_t y) {
     ev.pixel_data.player_no = player_no;
     ev.pixel_data.x = x;
     ev.pixel_data.y = y;
-
     emit_game_event(ev);
+
+    map_set(x, y);
 }
 
 
-bool Server::handle_player_eliminated(uint8_t player_no) {
+bool Server::handle_player_eliminated_event(uint8_t player_no) {
     GameEvent ev;
     ev.type = GameEvent::Type::PlayerEliminated;
     ev.player_eliminated_data.player_no = player_no;

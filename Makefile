@@ -5,38 +5,43 @@ CFLAGS = -Wall -Wextra -Wpedantic --std=c++14 -O3 -I.
 LFLAGS = -Wall -Wextra $(EXT_LIBS)
 
 
-HEADERS = common/network/HostAddress.hpp \
+HEADERS = \
 	common/utils.hpp \
-	common/utils_impl.hpp \
+	common/RandomNumberGenerator.hpp \
+	common/network/HostAddress.hpp \
 	common/network/Socket.hpp \
-	common/network/UdpSocket.hpp \
 	common/network/TcpSocket.hpp \
-	common/protocol/HeartBeat.hpp \
+	common/network/UdpSocket.hpp \
 	common/protocol/GameEvent.hpp \
+	common/protocol/HeartBeat.hpp \
 	common/protocol/MultipleGameEvent.hpp \
 	common/protocol/utils.hpp \
-	client/Client.hpp
+	client/Client.hpp \
+	server/Server.hpp
 
-COMMON_OBJS = common/network/HostAddress.o \
+COMMON_OBJS = \
 	common/RandomNumberGenerator.o \
+	common/network/HostAddress.o \
 	common/network/Socket.o \
-	common/network/UdpSocket.o \
 	common/network/TcpSocket.o \
-	common/protocol/HeartBeat.o \
+	common/network/UdpSocket.o \
 	common/protocol/GameEvent.o \
+	common/protocol/HeartBeat.o \
 	common/protocol/MultipleGameEvent.o \
 	common/protocol/utils.o
 
-SERVER_OBJS = server/main.o \
+SERVER_OBJS = \
+	server/main.o \
 	server/Server.o \
 	$(COMMON_OBJS)
 
-CLIENT_OBJS = client/main.o \
+CLIENT_OBJS = \
+	client/main.o \
 	client/Client.o \
 	$(COMMON_OBJS)
 
-siktacka: $(TARGET)
 all: siktacka
+siktacka: $(TARGET)
 
 %.o: %.cpp $(HEADERS)
 	$(CC) $(CFLAGS) -c $< -o $@

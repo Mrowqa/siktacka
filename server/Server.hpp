@@ -34,7 +34,6 @@ private:
         std::string name;
 
         int8_t player_no;  // number of players during game, -1 if observer
-        bool watching_game;
         bool got_new_game_event;
         std::chrono::system_clock::time_point last_heartbeat_time;
         bool ready_to_play;

@@ -280,7 +280,6 @@ Server::ClientContainer::iterator Server::handle_client_session(
         client.session_id = hb.session_id;
         client.name = hb.player_name;
         client.player_no = -1;
-        client.watching_game = game_state.game_in_progress;
         client.ready_to_play = false;
         // New clients should ask for event no 0.
         client.got_new_game_event = true;
@@ -317,12 +316,11 @@ void Server::send_events_to_clients() {
             continue;
         }
 
-        if (client.watching_game && !client.got_new_game_event) {
+        if (!client.got_new_game_event) {
             client.next_event_no = 0;
         }
 
-        if (!client.watching_game
-                || client.next_event_no >= game_state.serialized_events.size()) {
+        if (client.next_event_no >= game_state.serialized_events.size()) {
             server_state.next_client = advance_iterator_circularly(
                     server_state.clients, server_state.next_client);
             continue;
@@ -456,7 +454,6 @@ void Server::start_new_game_if_possible() {
     game_state.alive_players_cnt = game_state.players.size();
 
     for (auto &client : server_state.clients) {
-        client.second.watching_game = true;
         client.second.got_new_game_event = false;
         client.second.ready_to_play = false;
         if (client.second.name.empty()) {
@@ -532,8 +529,7 @@ bool Server::pending_work() const {
     auto events_number = game_state.serialized_events.size();
     if (std::any_of(server_state.clients.begin(), server_state.clients.end(),
                     [events_number](const auto &client) {
-        return client.second.watching_game &&
-                client.second.next_event_no < events_number;
+        return client.second.next_event_no < events_number;
     })) {
         return true;
     }

@@ -256,8 +256,12 @@ Server::ClientContainer::iterator Server::handle_client_session(
     else {
         // known client
         auto &client = client_it->second;
-        if (client.session_id != hb.session_id) {
+        if (hb.session_id < client.session_id) {
+            return server_state.clients.end();  // old session, dropping
+        }
+        else if (hb.session_id > client.session_id) {
             if (client.name != hb.player_name && !check_name_availability(hb.player_name)) {
+                // new session with already taken name
                 disconnect_client(client_it);
                 return server_state.clients.end();
             }
